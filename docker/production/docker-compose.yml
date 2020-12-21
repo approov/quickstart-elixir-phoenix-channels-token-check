@@ -1,0 +1,92 @@
+version: "2.1"
+
+services:
+
+  base-image:
+    image: approov/quickstart-elixir-phoenix-channels
+    build:
+      context: ./../dev
+      args:
+        - ELIXIR_DOCKER_TAG=${ELIXIR_DOCKER_TAG:-1.11-slim}
+
+  unprotected:
+    image: approov/quickstart-elixir-phoenix-channels:unprotect_${ELIXIR_DOCKER_TAG:-1.11-slim}
+    build:
+      context: .
+      args:
+        - SERVER_NAME=unprotected-server
+        - GIT_CHECKOUT_TO=${BUILD_RELEASE_FROM? Missing env var BUILD_RELEASE_FROM}
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.unprotected
+    depends_on:
+      base-image:
+        condition: service_started
+    networks:
+      - traefik
+      - default
+    volumes:
+      - ./:/home/developer/workspace
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=unprotected.${BASE_URL_PUBLIC_HOST? Missing value for: BASE_URL_PUBLIC_HOST}"
+      - "traefik.docker.network=traefik"
+      - "traefik.port=${HTTP_INTERNAL_PORT}"
+      - "traefik.frontend.rule=Host:unprotected.${BASE_URL_PUBLIC_HOST}"
+
+  approov-token:
+    image: approov/quickstart-elixir-phoenix-channels:approov-token_${ELIXIR_DOCKER_TAG:-1.11-slim}
+    build:
+      context: .
+      args:
+        - SERVER_NAME=approov-protected-server/token-check
+        - GIT_CHECKOUT_TO=${BUILD_RELEASE_FROM? Missing var BUILD_RELEASE_FROM}
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.approov-token
+    depends_on:
+      base-image:
+        condition: service_started
+    networks:
+      - traefik
+      - default
+    volumes:
+      - ./:/home/developer/workspace
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=token.${BASE_URL_PUBLIC_HOST? Missing value for: BASE_URL_PUBLIC_HOST}"
+      - "traefik.docker.network=traefik"
+      - "traefik.port=${HTTP_INTERNAL_PORT}"
+      - "traefik.frontend.rule=Host:token.${BASE_URL_PUBLIC_HOST}"
+
+  approov-token-binding:
+    image: approov/quickstart-elixir-phoenix-channels:approov-token-binding_${ELIXIR_DOCKER_TAG:-1.11-slim}
+    build:
+      context: .
+      args:
+        - SERVER_NAME=approov-protected-server/token-binding-check
+        - GIT_CHECKOUT_TO=${BUILD_RELEASE_FROM? Missing var BUILD_RELEASE_FROM}
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.approov-token-binding
+    depends_on:
+      base-image:
+        condition: service_started
+    networks:
+      - traefik
+      - default
+    volumes:
+      - ./:/home/developer/workspace
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=token-binding.${BASE_URL_PUBLIC_HOST? Missing value for: BASE_URL_PUBLIC_HOST}"
+      - "traefik.docker.network=traefik"
+      - "traefik.port=${HTTP_INTERNAL_PORT}"
+      - "traefik.frontend.rule=Host:token-binding.${BASE_URL_PUBLIC_HOST}"
+
+networks:
+  traefik:
+    external: true
