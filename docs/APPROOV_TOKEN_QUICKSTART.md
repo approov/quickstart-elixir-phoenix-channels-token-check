@@ -66,10 +66,10 @@ Approov tokens are signed with a symmetric secret. To verify tokens, you need to
 Retrieve the Approov secret with:
 
 ```text
-approov secret /path/to/approov/administration.tok -get base64url
+approov secret -get base64url
 ```
 
-> **NOTE:** The `approov secret` command requires an administration management token to execute successfully. Developer management tokens don't have sufficient privileges to get the secret.
+> **NOTE:** The `approov secret` command requires an [administration role](https://approov.io/docs/latest/approov-usage-documentation/#account-access-roles) to execute successfully.
 
 #### Set the Approov Secret
 
