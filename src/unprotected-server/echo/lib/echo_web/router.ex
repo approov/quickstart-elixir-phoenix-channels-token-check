@@ -1,7 +1,6 @@
 defmodule EchoWeb.Router do
   use EchoWeb, :router
 
-  import Plug.BasicAuth
   import Phoenix.LiveDashboard.Router
 
   pipeline :browser do
@@ -22,6 +21,7 @@ defmodule EchoWeb.Router do
   scope "/" do
     pipe_through :api
 
+    get "/", EchoWeb.EchoController, :show
     post "/auth/register", EchoWeb.AuthController, :register
     post "/auth/login", EchoWeb.AuthController, :login
   end

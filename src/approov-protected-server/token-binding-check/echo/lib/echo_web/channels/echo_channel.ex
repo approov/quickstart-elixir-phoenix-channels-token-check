@@ -27,11 +27,11 @@ defmodule EchoWeb.EchoChannel do
     end
   end
 
-  # Add your user authentication logic here as you see fit.
   defp _authorized(action, payload, socket) do
     Logger.info(%{phoenix_channel_action: action})
     Logger.info(%{phoenix_channel_payload: payload})
 
+    # Always perform the Approov token check before the User Authentication.
     with {:ok, approov_token_claims} <- ApproovToken.verify(payload, _approov_jwk()),
          :ok <- ApproovToken.verify_token_binding(approov_token_claims, payload),
          {:ok, current_user} <- Echo.User.authorize(params: payload),

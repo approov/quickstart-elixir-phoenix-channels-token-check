@@ -4,7 +4,7 @@
 
 This repo implements the Approov server-side request verification code in [Elixir](https://elixir-lang.org/), which performs the verification check before allowing valid traffic to be processed by the API endpoint.
 
-This is an Approov integration quickstart example for the Elixir Phoenix framework, that uses the Channels library to check the Approov token. If you are looking for another Elixir integration you can check our list of [quickstarts](https://approov.io/docs/latest/approov-integration-examples/backend-api/), and if you don't find what you are looking for, then please let us know [here](https://approov.io/contact).
+This is an Approov integration quickstart example for the Elixir Phoenix framework, that protects [Phoenix Channels](https://hexdocs.pm/phoenix/channels.html) with an Approov token check. If you are looking for another Elixir integration you can check our list of [quickstarts](https://approov.io/docs/latest/approov-integration-examples/backend-api/), and if you don't find what you are looking for, then please let us know [here](https://approov.io/contact).
 
 
 ## TOC - Table of Contents
@@ -80,14 +80,17 @@ git diff --no-index src/approov-protected-server/token-check/echo/lib/approov_to
 
 ## Testing the Approov Integration
 
-Each [Quickstart](#approov-integration-quickstarts) has at their end a dedicated section for testing. This section will walk you through the necessary steps to use the Approov CLI to generate valid and invalid tokens to test your Approov integration without the need to rely on the genuine mobile app(s) using your backend.
+Each [Quickstart](#approov-integration-quickstarts) has at their end a dedicated section for testing, that will walk you through the necessary steps to use the Approov CLI to generate valid and invalid tokens to test your Approov integration without the need to rely on the genuine mobile app(s) using your backend. The tests also include examples for the Phoenix Channel websocket.
+
+* [Approov Token](/docs/APPROOV_TOKEN_QUICKSTART.md#test-the-approov-integration) test examples.
+* [Approov Token Binding](/docs/APPROOV_TOKEN_BINDING_QUICKSTART.md#test-the-approov-integration) test examples.
 
 [TOC](#toc---table-of-contents)
 
 
 ## Approov Integration Examples
 
-The code examples for the Approov quickstarts are extracted from this simple [Approov integration examples](/src/approov-protected-server) for the backend server:
+The code examples for the Approov quickstarts are extracted from this simple Approov integration examples for the Echo backend server:
 
 * [Approov Token](/src/approov-protected-server/token-check/echo) protected example server.
 * [Approov Token Binding](/src/approov-protected-server/token-binding-check/echo) protected example server.

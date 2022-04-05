@@ -36,11 +36,11 @@ defmodule Echo.MixProject do
       {:phoenix, "~> 1.5.1"},
       {:telemetry_metrics, "~> 0.4"},
       {:telemetry_poller, "~> 0.4"},
-      {:jason, "~> 1.0"},
+      {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.0"},
-      {:bcrypt_elixir, "~> 2.0"},
+      {:bcrypt_elixir, "~> 3.0"},
       {:phoenix_live_dashboard, "~> 0.1"},
-      {:jose, "~> 1.10.1"},
+      {:jose, "~> 1.11"},
     ]
   end
 

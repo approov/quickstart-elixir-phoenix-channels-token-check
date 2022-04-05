@@ -19,8 +19,11 @@ defmodule EchoWeb.UserSocket do
   def id(_socket), do: nil
 
   defp _authorize(socket, params, connect_info) do
-    # Add your user authentication logic here as you see fit. For example:
-    with {:ok, _approov_token_claims} <- ApproovToken.verify(connect_info, _approov_jwk()),
+
+    headers = Map.merge(params, connect_info)
+
+    # Always perform the Approov token check before the User Authentication.
+    with {:ok, _approov_token_claims} <- ApproovToken.verify(headers, _approov_jwk()),
          {:ok, current_user} <- Echo.User.authorize(params: params) do
 
       socket = Phoenix.Socket.assign(socket, context: %{current_user: current_user})

@@ -16,6 +16,8 @@ defmodule Echo.User do
       password_hash: _hash_password(username, password)
     }
 
+    IO.inspect user
+
     case Echo.Repo.insert(user, @table) do
       {:ok, record} ->
         {:ok, %{uid: record.uid}}

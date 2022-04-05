@@ -35,7 +35,9 @@ defmodule ApproovToken do
     end
   end
 
-  defp _get_approov_token(%{x_headers: x_headers}) when is_list(x_headers) do
+  defp _get_approov_token(%{x_headers: x_headers})
+    when is_list(x_headers) and length(x_headers) > 0
+  do
     case Utils.filter_list_of_tuples(x_headers, "x-approov-token") do
       nil ->
         {:ok, Utils.filter_list_of_tuples(x_headers, "X-Approov-Token")}
@@ -63,7 +65,9 @@ defmodule ApproovToken do
     end
   end
 
-  defp _decode_and_verify(approov_token, approov_jwk) do
+  defp _decode_and_verify(approov_token, approov_jwk)
+    when is_binary(approov_token) and byte_size(approov_token) > 0
+  do
     case JOSE.JWT.verify_strict(approov_jwk, ["HS256"], approov_token) do
       {true, approov_token_claims, _jws} ->
         {:ok, approov_token_claims}
@@ -71,12 +75,18 @@ defmodule ApproovToken do
       {false, _approov_token_claims, _jws} ->
         {:error, :approov_token_invalid_signature}
 
-      {:error, {:badarg, _arg}} ->
+      {:error, {:badarg, _arg} = _reason} ->
+        # Without the new guard clause in the function header it would also
+        # occur when the token is `nil`.
         {:error, :approov_token_malformed}
 
       {:error, _reason} ->
         {:error, :jwt_library_internal_error}
     end
+  end
+
+  defp _decode_and_verify(_approov_token, _approov_jwk) do
+    {:error, :approov_token_empty}
   end
 
   defp _has_expiration_claim?(%JOSE.JWT{fields: %{"exp" => _exp}}), do: true

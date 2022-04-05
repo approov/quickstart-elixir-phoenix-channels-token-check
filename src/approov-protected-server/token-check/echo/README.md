@@ -7,12 +7,14 @@ This Approov integration example is from where the code example for the [Approov
 * [Why?](#why)
 * [How it Works?](#how-it-works)
 * [Requirements](#requirements)
-* [Try the Approov Integration Example](#try-it)
+* [Running the Approov Protected Server](#running-the-approov-protected-server)
+* [Testing with Postman](#testing-with-postman)
+* [Testing with a Mobile App](#testing-with-a-mobile-app)
 
 
 ## Why?
 
-To lock down your Phoenix Channels server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product.html) for more details.
+To lock down your Phoenix Channels server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 
@@ -25,7 +27,7 @@ The server only replies to Phoenix Channels websocket connections and to the `au
 
 ### Approov Token Check
 
-Take a look at the [Approov Token Plug](/src/approov-protected-server/token-check/echo/lib/echo_web/plugs/approov_token_plug.ex) module to see how the Approov token check is invoked in the `call/2` function. To see the simple code for the Approov token check, you need to look into the `verify/1` function in the [Approov Token](src/approov-protected-server/token-check/echo/lib/approov_token.ex) module.
+Take a look at the [Approov Token Plug](/src/approov-protected-server/token-check/echo/lib/echo_web/plugs/approov_token_plug.ex) module to see how the Approov token check is invoked in the `call/2` function. To see the simple code for the Approov token check, you need to look into the `verify/1` function in the [Approov Token](/src/approov-protected-server/token-check/echo/lib/approov_token.ex) module.
 
 For more background on Approov, see the overview in the [README](/README.md#how-it-works) at the root of this repo.
 
@@ -58,11 +60,19 @@ Alternatively, you can use the provided docker stack via `src/approov-protected-
 [TOC](#toc---table-of-contents)
 
 
-## Try It
-
-To test Approov you need to deploy the backend online, because the Approov Cloud service needs to reach it to extract the pin for the TLS certificate used by the backend. This is necessary to configure the [dynamic certificate pinning](https://approov.io/docs/latest/approov-usage-documentation/#approov-dynamic-pinning) setup, that a mobile app gets out of the box when using the Approov SDK. Approov Dynamic Pinning secures the communication channel between your mobile app and your backend, with all the benefits of traditional pinning but without the drawbacks.
+## Running the Approov Protected Server
 
 All the following shell commands will assume that you have your terminal open at the `src/approov-protected-server/token-check/echo` folder.
+
+From the root of this repo you can execute this bash command:
+
+```bash
+cd src/approov-protected-server/token-check/echo
+```
+
+### The Dummy Secret
+
+The valid Approov tokens in the Postman collection and cURL requests examples were signed with the dummy secret `h-CX0tOzdAAR9l15bWAqvq7w9olk66daIH-Xk-IAHhVVHszjDzeGobzNnqyRze3lw_WVyWrc2gZfh3XXfBOmww` that was generated with `openssl rand -base64 64 | tr -d '\n'; echo`, therefore not a production secret retrieved with the Approov CLI command `approov secret -get base64url`.
 
 ### Create the `.env` File
 
@@ -72,28 +82,44 @@ First, create the `.env` from `.env.example`:
 cp .env.example .env
 ```
 
-Now, edit the `.env` file and adjust the `APPROOV_BASE64URL_SECRET` and the other secrets accordingly to the provided instructions in the comments.
+Now, edit the `.env` file and adjust the `APPROOV_BASE64URL_SECRET` to the dummy secret value specified in the [previous section](#the-dummy-secret).
+
+Next, populate the other secrets accordingly to the provided instructions in the comments of the `env` file.
 
 ### Run the Server with your Elixir Stack
 
 > **IMPORTANT:** If you already have run the server with the Elixir docker stack we provide via the `docker-compose.yml` file then you need to delete the `_build` and `deps` folders.
 
-First, you need to set the variables from the recently created `.env` file in your environment:
+First, don't forget to ensure that you are at the `src/approov-protected-server/token-check/echo` folder.
 
-```text
+Afterwards, you need to set the variables from the recently created `.env` file in your environment:
+
+```bash
 export $(grep -v '^#' .env | xargs -0)
 ```
 
 Next, you need to install the dependencies with:
 
-```text
+```bash
 mix deps.get
+```
+
+Then you need to compile the dependencies with:
+
+```bash
+mix deps.compile
 ```
 
 Now, you can run this server with an interactive `iex` shell:
 
-```text
+```bash
 iex -S mix phx.server
+```
+
+Or, run the server without an interactive `iex` shell:
+
+```bash
+mix phx.server
 ```
 
 [TOC](#toc---table-of-contents)
@@ -102,36 +128,247 @@ iex -S mix phx.server
 
 > **IMPORTANT:** If you already have run the server with your local Elixir stack then before you try the docker stack you need to delete the `_build` and `deps` folders.
 
-First, you need to install the dependencies with:
+First, don't forget to ensure that you are in the correct folder, from the root of this repo you can execute this bash command:
 
-```text
+```bash
+cd src/approov-protected-server/token-check/echo
+```
+
+Afterwards, build the docker image with:
+
+```bash
+sudo docker-compose build approov-token-protected-dev
+```
+
+Next, you need to install the dependencies with:
+
+```bash
 sudo docker-compose run --rm approov-token-protected-dev mix deps.get
+```
+
+Then you need to compile the dependencies with:
+
+```bash
+sudo docker-compose run --rm approov-token-protected-dev mix deps.compile
 ```
 
 Now, run the server with an interactive `iex` shell inside the docker container:
 
-```text
+```bash
 sudo docker-compose run --rm --service-ports approov-token-protected-dev iex -S mix phx.server
 ```
 
 Or, run the server without an interactive `iex` shell:
 
-```text
+```bash
 sudo docker-compose up
 ```
 
-When you finish testing you may want to completely remove the docker stack:
+Finally, you can do a smoke test to check that it is up and running with:
+
+```bash
+curl -iX GET 'http://localhost:8002'
+```
+
+The response will be:
 
 ```text
-sudo docker-compose down
-docker image ls | grep 'approov/quickstart-elixir-phoenix-channels' | awk '{print $3}' | xargs sudo docker image rm
+HTTP/1.1 401 Unauthorized
+cache-control: max-age=0, private, must-revalidate
+content-length: 2
+content-type: application/json; charset=utf-8
+date: Thu, 31 Mar 2022 22:09:56 GMT
+server: Cowboy
+x-request-id: FuGWqmhGv58mr1IAAAZC
+
+{}
 ```
+
+The reason you got a `401` is because the Approoov token isn't provided in the headers of the request.
+
+Now that you know the server is working you can use Postman or the companion mobile app to test the Phoenix Channels websocket. Check the next sections to see how to.
 
 [TOC](#toc---table-of-contents)
 
-### Test with the Echo Chamber Mobile App
 
-Finally, you can test that it works by following [this instructions](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/master/src/echo-chamber-app/README.md#enable-approov-in-the-echo-chamber-mobile-app) to run the Echo Chamber mobile app example for this quickstart example backend.
+## Testing With Postman
 
+You will use cURL to create and login an user and then use Postman to connect to the Phoenix channels websocket and to send messages to it.
+
+### User Registration and Login via cURL
+
+To make the cURL requests it's necessary an Approov token. In the `.env` file you have configured this server with a dummy secret for Approov, therefore the below Approov tokens were signed with it.
+
+First, let's register an user with:
+
+```bash
+curl --request POST 'http://localhost:8002/auth/register' \
+  --header "X-Approov-Token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjQ3MDg2ODMyMDUuODkxOTEyfQ.c8I4KNndbThAQ7zlgX4_QDtcxCrD9cff1elaCJe9p9U" \
+  --data username=test@mail.com \
+  --data password=your-super-secret-long-strong-pass-here
+```
+
+The request should be accepted. For example:
+
+```json
+{"id":"B4C20F1BBC39F610CF4608F83A06DEA85884D77C854BBB3D10EF239641B9B861"}
+```
+
+Next, let's login the user with the Approov protected endpoint:
+
+```bash
+curl --request POST 'http://localhost:8002/auth/login' \
+  --header "X-Approov-Token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjQ3MDg2ODMyMDUuODkxOTEyfQ.c8I4KNndbThAQ7zlgX4_QDtcxCrD9cff1elaCJe9p9U" \
+  --data username=test@mail.com \
+  --data password=your-super-secret-long-strong-pass-here
+```
+
+The request should be accepted. For example:
+
+```json
+{"token":"Bearer ___YOUR_AUTHORIZATION_TOKEN___"}
+```
+
+Finally, you have the Bearer Authorization token that is required to represent a logged-in user when using Postman to establish a websocket connection and send messages to the backend. Keep the Authorization token at hand, because you will need to use it in Postman.
+
+### Setup Postman
+
+First, you need to bear in mind that support for websockets in Postman is only supported in workspaces, that require you to be a logged-in user.
+
+Next, create a Postman environment and add to it the variable `AUTHORIZATION_TOKEN` with the value being the bearer token you got from the login request `Bearer ___YOUR_AUTHORIZATION_TOKEN___`. **No need to copy the word Bearer**.
+
+A Postman collection cannot be provided (at the time of writing), because Postman doesn't have support to export a websocket collection, like it has for REST APIs. So, start by creating one, and give it a name, for example `Approoov - Phoenix Channels`, and afterwards select the environment you have created above for this collection.
+
+Finally, you are now ready to start creating your websocket request to connect to the `echo:chamber` Phoenix channel for  sending messages to it.
+
+### Phoenix Channel Websosocket - Valid Requests
+
+In this section you will use Postman to connect to the Phoenix Channel and for sending messages to it.
+
+#### Connect to a Phoenix Channel
+
+First, you need to create a websocket request in your newly created collection, where you will use this URL and parameters:
+
+```text
+ws://localhost:8002/socket/websocket?Authorization=Bearer {{AUTHORIZATION_TOKEN}}&X-Approov-Token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjQ3MDg2ODMyMDUuODkxOTEyfQ.c8I4KNndbThAQ7zlgX4_QDtcxCrD9cff1elaCJe9p9U
+```
+
+Next, to connect to the Phoenix channel just click the `Connect` button on the right side of the request URL.
+
+The request to connect should have been accepted, and a green tick should be seen in the message tab entry for the request, unless you forgot to update the Authorization token, or messed with the Approov token.
+
+#### Joining a Phoenix Channel Topic
+
+First, you need to create the joining event message to send to the Phoenix channel, for example:
+
+```json
+{
+    "event": "phx_join",
+    "topic": "echo:chamber",
+    "ref": "approov-token",
+    "payload": {
+        "X-Approov-Token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjQ3MDg2ODMyMDUuODkxOTEyfQ.c8I4KNndbThAQ7zlgX4_QDtcxCrD9cff1elaCJe9p9U",
+        "Authorization": "Bearer {{AUTHORIZATION_TOKEN}}"
+    }
+}
+```
+
+Now, you can save it and give it a name, like `phx_join`. Afterwards, you can click in the `Send` button, and you should see in the `Messages` tab the successful connection, followed by the message you sent and by the reply from the Phoenix Channel.
+
+Example of a reply received from the Phoenix Channel:
+
+```json
+{
+    "event": "phx_reply",
+    "payload": {
+        "response": {},
+        "status": "ok"
+    },
+    "ref": "approov-token",
+    "topic": "echo:chamber"
+}
+```
+
+You are now subscribed to the Phoenix channel topic `echo:chamber`, therefore you can start sending as many messages to it as you want.
+
+#### Sending Messages to the Phoenix Channel Topic
+
+First, to send your message you need to compose another message, for example:
+
+```json
+{
+    "event": "echo_it",
+    "topic": "echo:chamber",
+    "ref": "approov-token",
+    "payload": {
+        "message": "Approov Protected Phoenix Channel",
+        "X-Approov-Token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjQ3MDg2ODMyMDUuODkxOTEyfQ.c8I4KNndbThAQ7zlgX4_QDtcxCrD9cff1elaCJe9p9U",
+        "Authorization": "Bearer {{AUTHORIZATION_TOKEN}}"
+    }
+}
+```
+
+Now, you can save the message with the name `echo_it` and then click in the `Send` button, and finally you should see the event being sent in the `Messages` tab, followed by the reply from the Phoenix Channel.
+
+Example of a reply received from the Phoenix Channel:
+
+```json
+{
+    "event": "echo:chamber",
+    "payload": {
+        "message": "Approov Protected Phoenix Channel, Approov Protected Phoenix Channel, Approov Protected Phoenix Channel..."
+    },
+    "ref": null,
+    "topic": "echo:chamber"
+}
+```
+
+As you can see the message you sent was echoed three times in the reply. Try it now with your own message.
+
+To customize the message you need to find the key `payload > message` on the JSON that is sent to the Phoenix Channel and replace the value `___YOUR_MESSAGE_HERE___` with whatever you want:
+
+```json
+{
+    "payload": {
+        "message": "___YOUR_MESSAGE_HERE___",
+    }
+}
+```
+
+### Phoenix Channel Websosocket - Invalid Requests
+
+Until now you have connected to the Phoenix Channel websocket with valid Approov tokens, but I now challenge you to try out other requests for failure scenarios:
+
+* Expired Approov token, for example `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1NTUwODMzNDkuMzc3NzYyM30.XzZs_ItunAmisfTAuLLHqTytNnQqnwqh0Koh3PPKAoM`.
+* Invalid signature for the Approov token, for example `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjQ3MDg2ODMyMDUuODkxOTEyfQ.c8I4KNndbThAQ7zlgX4_QDtcxCrD9cff1elaCJe9p9A`
+* Malformed token, for example `abc.cde`
+* Not sending the Approov token
+* Sending the Approov token as an empty string
+
+To test such scenarios just edit/duplicate the websocket request and replace the Approov token with one of the dummy tokens provided above.
+
+While doing such requests you will notice that you will never be able to connect to the Phoenix channel, and this is because the Approov token isn't a valid one or is missing in the request.
+
+Being able to test the Phoenix Channels websocket from Postman isn't the only option, as per the next section.
+
+[TOC](#toc---table-of-contents)
+
+
+## Testing with a Mobile App
+
+To test the echo chamber functionality, that uses Phoenix channels via websockets, you need to follow [this instructions](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/master/ECHO-CHAMBER-EXAMPLE.md#try-the-echo-chamber-app-without-approov) to run the Echo Chamber mobile app example for this backend.
+
+
+[TOC](#toc---table-of-contents)
+
+
+## Docker Stack Cleanup
+
+If you were using the included docker stack, then after finish testing you may want to completely remove the docker stack. Just execute the two below commands:
+
+```bash
+sudo docker-compose down
+docker image ls | grep 'approov/quickstart-elixir-phoenix-channels' | awk '{print $3}' | xargs sudo docker image rm
+```
 
 [TOC](#toc---table-of-contents)

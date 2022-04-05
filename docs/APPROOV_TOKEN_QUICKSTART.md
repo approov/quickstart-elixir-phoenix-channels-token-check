@@ -14,7 +14,7 @@ This quickstart is for developers familiar with Phoenix who are looking for a qu
 
 ## Why?
 
-To lock down your Elixir Phoenix Channels server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product.html) for more details.
+To lock down your Elixir Phoenix Channels server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 
@@ -182,7 +182,9 @@ defmodule ApproovToken do
     end
   end
 
-  defp _get_approov_token(%{x_headers: x_headers}) when is_list(x_headers) do
+  defp _get_approov_token(%{x_headers: x_headers})
+    when is_list(x_headers) and length(x_headers) > 0
+  do
     case Utils.filter_list_of_tuples(x_headers, "x-approov-token") do
       nil ->
         {:ok, Utils.filter_list_of_tuples(x_headers, "X-Approov-Token")}
@@ -210,7 +212,9 @@ defmodule ApproovToken do
     end
   end
 
-  defp _decode_and_verify(approov_token, approov_jwk) do
+  defp _decode_and_verify(approov_token, approov_jwk)
+    when is_binary(approov_token) and byte_size(approov_token) > 0
+  do
     case JOSE.JWT.verify_strict(approov_jwk, ["HS256"], approov_token) do
       {true, approov_token_claims, _jws} ->
         {:ok, approov_token_claims}
@@ -218,12 +222,16 @@ defmodule ApproovToken do
       {false, _approov_token_claims, _jws} ->
         {:error, :approov_token_invalid_signature}
 
-      {:error, {:badarg, _arg}} ->
+      {:error, {:badarg, _arg} = _reason} ->
         {:error, :approov_token_malformed}
 
       {:error, _reason} ->
         {:error, :jwt_library_internal_error}
     end
+  end
+
+  defp _decode_and_verify(_approov_token, _approov_jwk) do
+    {:error, :approov_token_empty}
   end
 
   defp _has_expiration_claim?(%JOSE.JWT{fields: %{"exp" => _exp}}), do: true
@@ -247,8 +255,6 @@ defmodule ApproovToken do
   end
 
   defp _timestamp_to_datetime(timestamp) when is_float(timestamp) do
-    # iex> Integer.parse "1555083349.3777623"
-    # {1555083349, ".3777623"}
     {timestamp, _decimals} = Integer.parse("#{timestamp}")
     DateTime.from_unix!(timestamp)
   end
@@ -343,11 +349,13 @@ For using Websockets in Elixir we have the excellent [Phoenix Channels](https://
 First, open the file where you establish the websocket connection, maybe `lib/your-app/user_socket.ex` or whatever file name you use, and add to it this code:
 
 ```elixir
-defp _authorize(socket, params) do
+defp _authorize(socket, params, connect_info) do
+
+  headers = Map.merge(params, connect_info)
+
   # Always perform the Approov token check before the User Authentication.
-  with {:ok, _approov_token_claims} <- ApproovToken.verify(params, _approov_jwk()),
-       # OPTIONAL: Add your user authentication logic here as you see fit. For example:
-       {:ok, current_user} <- YourApp.User.authorize(params: params) do
+  with {:ok, _approov_token_claims} <- ApproovToken.verify(headers, _approov_jwk()),
+       {:ok, current_user} <- Echo.User.authorize(params: params) do
 
     socket = Phoenix.Socket.assign(socket, context: %{current_user: current_user})
 
@@ -362,12 +370,12 @@ end
 defp _approov_jwk() do
   %{
     "kty" => "oct",
-    "k" =>  Application.fetch_env!(:your_app, ApproovToken)[secret_key]
+    "k" =>  Utils.fetch_from_env!(:your_app, ApproovToken, :secret_key, 64, :string)
   }
 end
 ```
 
-The above `authorize/2` function needs to be the first one to be invoked in your `connect/3` function pipeline. For example:
+The above `_authorize/2` function needs to be the first one to be invoked in your `connect/3` function pipeline. For example:
 
 ```elixir
 def connect(params, socket, _connect_info) do
@@ -383,19 +391,21 @@ Next, you need to secure each event coming through the websocket via a Phoenix C
 
 ```elixir
 defp _authorized(action, payload, socket) do
+  Logger.info(%{phoenix_channel_action: action})
+  Logger.info(%{phoenix_channel_payload: payload})
+
   # Always perform the Approov token check before the User Authentication.
   with {:ok, _approov_token_claims} <- ApproovToken.verify(payload, _approov_jwk()),
-       # OPTIONAL: Add your user authentication logic here as you see fit. For example:
-       {:ok, current_user} <- YourApp.User.authorize(params: payload),
-       true <- YourApp.User.can_do_action?(action, current_user) do
+       {:ok, current_user} <- Echo.User.authorize(params: payload),
+       true <- Echo.User.can_do_action?(action, current_user) do
     {:ok, socket}
   else
-    {:error, reason} ->
-      # log here as you see fit.
+    {:error, _reason} ->
+      # log here the error as you see fit.
       :error
 
     false ->
-      # log here as you see fit.
+      # log here the error as you see fit.
       :error
   end
 end
@@ -403,7 +413,7 @@ end
 defp _approov_jwk() do
   %{
     "kty" => "oct",
-    "k" =>  Application.fetch_env!(:your_app, ApproovToken)[secret_key]
+    "k" =>  Utils.fetch_from_env!(:echo, ApproovToken, :secret_key, 64, :string)
   }
 end
 ```
@@ -455,13 +465,13 @@ The following examples below uses cURL to test the user authentication endpoints
 
 Generate a valid token example from the Approov Cloud service:
 
-```text
+```bash
 approov token -genExample your.api.domain.com
 ```
 
 Let's try to register the user with the Approov protected endpoint:
 
-```text
+```bash
 curl -i --request POST 'https://your.api.domain.com/auth/register' \
   --header 'X-Approov-Token: APPROOV_VALID_TOKEN_EXAMPLE_HERE' \
   --data username=test@mail.com \
@@ -470,7 +480,7 @@ curl -i --request POST 'https://your.api.domain.com/auth/register' \
 
 The request should be accepted. For example:
 
-```text
+```bash
 HTTP/2 200
 ...
 
@@ -479,7 +489,7 @@ HTTP/2 200
 
 Next, let's login the user with the Approov protected endpoint:
 
-```text
+```bash
 curl -i --request POST 'your.api.domain.com/auth/login' \
   --header 'X-Approov-Token: APPROOV_VALID_TOKEN_EXAMPLE_HERE' \
   --data username=test@mail.com \
@@ -502,13 +512,13 @@ Finally we have the Bearer Authorization token that is required to represent a l
 
 Generate a valid token example from the Approov Cloud service:
 
-```text
+```bash
 approov token -genExample your.api.domain.com
 ```
 
 Then make the request with the generated token:
 
-```text
+```bash
 curl -i --request GET 'your.api.domain.com/users' \
   --header 'X-Approov-Token: APPROOV_VALID_TOKEN_EXAMPLE_HERE' \
   --header 'Authorization: Bearer AUTHORIZATION_VALID_TOKEN' \
@@ -532,13 +542,13 @@ HTTP/2 200
 
 Generate an invalid token example from the Approov Cloud service:
 
-```text
+```bash
 approov token -type invalid -genExample your.api.domain.com
 ```
 
 Then make the request with the generated token:
 
-```text
+```bash
 curl -i --request GET 'your.api.domain.com/users' \
   --header 'X-Approov-Token: APPROOV_INVALID_TOKEN_EXAMPLE_HERE' \
   --header 'Authorization: Bearer AUTHORIZATION_VALID_TOKEN' \
@@ -562,29 +572,22 @@ Despite the Authorization token being a valid one, the server refuses to accept 
 
 ### Test your Approov Integration with Websockets
 
-Phoenix Channels cannot be tested using cURL, because you need to establish a websocket connection and keep it open, therefore you will need to try an online websocket client in the likes of what Postman is for HTTP requests. Check this [Stackoverflow question](https://stackoverflow.com/questions/42269075/websocket-connections-with-postman) for some clients that allow to test websockets servers from a browser.
+Phoenix Channels cannot be tested using cURL, because you need to establish a websocket connection and keep it open, therefore you will need to use Postman or another software that supports websockets.
 
-So, when using one of this online clients you will need to add the Approov token to the request that establishes the connection and to each event you send to the backend.
+We recommend the use of Postman and we provide [this collection](https://raw.githubusercontent.com/approov/postman-collections/master/quickstarts/echo/echo-websockets.postman_collection.json) to help you get started.
 
-For establishing the websocket connection you may be allowed to add the `X-Approov-Token` header in the request, otherwise you will need to add it as a query parameter in the url used to establish the connection `?X-Approov-Token=token-here`.
+You can check [this examples](./../src/approov-protected-server/token-check/echo/README.md#testing-with-postman) to see a practical example of this collection being used. Remember that when following this Postman examples you need to generate the Approov tokens with the Approov CLI, or use the same Approov secret from the examples.
 
-For each websocket event sent to the backend you also need to add the `X-Approov-Token` as a parameter to the request body json paylaod:
+To generate a valid Approov token from the Approov Cloud service:
 
-```json
-{
-  "X-Approov-Token": "approov.token.here",
-  "your-payload": "your-data"
-}
-```
-
-To generate a valid token example from the Approov Cloud service:
-
-```text
+```bash
 approov token -genExample your.api.domain.com
 ```
 
-To generate an invalid token example from the Approov Cloud service:
+To generate an invalid Approov token example from the Approov Cloud service:
 
-```text
+```bash
 approov token -type invalid -genExample your.api.domain.com
 ```
+
+[TOC](#toc---table-of-contents)

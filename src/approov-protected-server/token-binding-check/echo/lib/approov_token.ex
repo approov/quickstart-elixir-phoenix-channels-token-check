@@ -36,7 +36,9 @@ defmodule ApproovToken do
     end
   end
 
-  defp _get_approov_token(%{x_headers: x_headers}) when is_list(x_headers) do
+  defp _get_approov_token(%{x_headers: x_headers})
+    when is_list(x_headers) and length(x_headers) > 0
+  do
     case Utils.filter_list_of_tuples(x_headers, "x-approov-token") do
       nil ->
         {:ok, Utils.filter_list_of_tuples(x_headers, "X-Approov-Token")}
@@ -64,7 +66,9 @@ defmodule ApproovToken do
     end
   end
 
-  defp _decode_and_verify(approov_token, approov_jwk) do
+  defp _decode_and_verify(approov_token, approov_jwk)
+    when is_binary(approov_token) and byte_size(approov_token) > 0
+  do
     case JOSE.JWT.verify_strict(approov_jwk, ["HS256"], approov_token) do
       {true, approov_token_claims, _jws} ->
         {:ok, approov_token_claims}
@@ -78,6 +82,10 @@ defmodule ApproovToken do
       {:error, _reason} ->
         {:error, :jwt_library_internal_error}
     end
+  end
+
+  defp _decode_and_verify(_approov_token, _approov_jwk) do
+    {:error, :approov_token_empty}
   end
 
   defp _has_expiration_claim?(%JOSE.JWT{fields: %{"exp" => _exp}}), do: true
@@ -167,13 +175,7 @@ defmodule ApproovToken do
     end
   end
 
-  # Note that the `pay` claim will, under normal circumstances, be present,
-  # but if the Approov failover system is enabled, then no claim will be
-  # present, and in this case you want to return true, otherwise you will not
-  # be able to benefit from the redundancy afforded by the failover system.
   defp _verify_approov_token_binding(_approov_token_claims, _token_binding_header) do
-    # You may want to add some logging here
-    Logger.warn("Missing the `pay` claim in the Approov token.")
-    :ok
+    {:error, :approov_token_missing_pay_claim}
   end
 end
