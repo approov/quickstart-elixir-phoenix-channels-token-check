@@ -40,7 +40,7 @@ defmodule Echo.MixProject do
       {:plug_cowboy, "~> 2.0"},
       {:bcrypt_elixir, "~> 3.0"},
       {:phoenix_live_dashboard, "~> 0.1"},
-      {:jose, "~> 1.11"},
+      {:joken, "~> 2.4"},
     ]
   end
 

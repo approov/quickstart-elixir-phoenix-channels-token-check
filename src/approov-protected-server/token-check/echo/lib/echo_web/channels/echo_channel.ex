@@ -32,7 +32,7 @@ defmodule EchoWeb.EchoChannel do
     Logger.info(%{phoenix_channel_payload: payload})
 
     # Always perform the Approov token check before the User Authentication.
-    with {:ok, _approov_token_claims} <- ApproovToken.verify(payload, _approov_jwk()),
+    with {:ok, _approov_token_claims} <- ApproovToken.verify_token(payload),
          {:ok, current_user} <- Echo.User.authorize(params: payload),
          true <- Echo.User.can_do_action?(action, current_user) do
       {:ok, socket}
@@ -45,13 +45,6 @@ defmodule EchoWeb.EchoChannel do
         _log_error("User cannot perform the action: #{action}")
         :error
     end
-  end
-
-  defp _approov_jwk() do
-    %{
-      "kty" => "oct",
-      "k" =>  Utils.fetch_from_env!(:echo, ApproovToken, :secret_key, 64, :string)
-    }
   end
 
   defp _log_error(reason) when is_atom(reason), do: Logger.warn(Atom.to_string(reason))

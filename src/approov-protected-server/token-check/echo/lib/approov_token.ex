@@ -1,118 +1,63 @@
 defmodule ApproovToken do
   require Logger
 
-  def verify(%Plug.Conn{} = conn, %{} = approov_jwk) do
-    with {:ok, approov_token} <- _get_approov_token_header(conn),
-         {:ok, approov_token_claims} <- _verify_approov_token(approov_token, approov_jwk) do
+  use Joken.Config
 
-      {:ok, approov_token_claims}
-    else
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
+  @impl Joken.Config
+  def token_config, do: default_claims(skip: [:aud, :iat, :iss, :jti, :nbf])
 
-  def verify(%{} = params, %{} = approov_jwk) do
+  # Verifies the token from an HTTP request or from a Websockets connection/event
+  def verify_token(params) do
     with {:ok, approov_token} <- _get_approov_token(params),
-         {:ok, approov_token_claims} <- _verify_approov_token(approov_token, approov_jwk) do
+         {:ok, approov_token_claims} <- _decode_and_verify(approov_token) do
 
       {:ok, approov_token_claims}
     else
       {:error, reason} ->
+        Logger.info(%{approov_token_error: reason})
         {:error, reason}
     end
   end
 
-  defp _get_approov_token_header(conn) do
+
+  ########################
+  # APPROOV TOKEN FETCH
+  ########################
+
+  # For when the Approov token is the header of a regular HTTP Request
+  defp _get_approov_token(%Plug.Conn{} = conn) do
     case Plug.Conn.get_req_header(conn, "x-approov-token") do
       [] ->
         Logger.info("Approov token not in the headers. Next, try to retrieve from url query params.")
+        Logger.info(%{headers: conn.req_headers, params: conn.params})
         _get_approov_token(conn.params)
 
       [approov_token | _] ->
-
         {:ok, approov_token}
     end
   end
 
-  defp _get_approov_token(%{x_headers: x_headers})
-    when is_list(x_headers) and length(x_headers) > 0
-  do
-    case Utils.filter_list_of_tuples(x_headers, "x-approov-token") do
-      nil ->
-        {:ok, Utils.filter_list_of_tuples(x_headers, "X-Approov-Token")}
-
-      approov_token ->
-        {:ok, approov_token}
-    end
-  end
-
+  # Fetch for a Phoenix Channel event, where the token is provided in the event
+  # payload.
   defp _get_approov_token(%{"x-approov-token" => approov_token}), do: {:ok, approov_token}
   defp _get_approov_token(%{"X-Approov-Token" => approov_token}), do: {:ok, approov_token}
-  defp _get_approov_token(_params), do: {:error, :missing_approov_token}
 
-  defp _verify_approov_token(approov_token, approov_jwk) do
-    with {:ok, approov_token_claims} <- _decode_and_verify(approov_token, approov_jwk),
-         true <- _has_expiration_claim?(approov_token_claims),
-         :ok <- _verify_expiration(approov_token_claims) do
-      {:ok, approov_token_claims}
-    else
-      {:error, reason} ->
-        {:error, reason}
-
-      false ->
-        {:error, :approov_token_missing_expiration_claim}
-    end
+  # Catch failure to fetch the Approov token from the WebSocket upgrade request
+  # or from the Phoenix Channel event.
+  defp _get_approov_token(_params) do
+    {:error, :missing_approov_token}
   end
 
-  defp _decode_and_verify(approov_token, approov_jwk)
-    when is_binary(approov_token) and byte_size(approov_token) > 0
-  do
-    case JOSE.JWT.verify_strict(approov_jwk, ["HS256"], approov_token) do
-      {true, approov_token_claims, _jws} ->
-        {:ok, approov_token_claims}
 
-      {false, _approov_token_claims, _jws} ->
-        {:error, :approov_token_invalid_signature}
+  ########################
+  # APPROOV TOKEN CHECK
+  ########################
 
-      {:error, {:badarg, _arg} = _reason} ->
-        # Without the new guard clause in the function header it would also
-        # occur when the token is `nil`.
-        {:error, :approov_token_malformed}
+  defp _decode_and_verify(approov_token) do
+    secret = Application.fetch_env!(:echo, ApproovToken)[:secret_key]
 
-      {:error, _reason} ->
-        {:error, :jwt_library_internal_error}
-    end
+    # call `verify_and_validate/2` injected by `use Joken.Config`
+    verify_and_validate(approov_token, Joken.Signer.create("HS256", secret))
   end
 
-  defp _decode_and_verify(_approov_token, _approov_jwk) do
-    {:error, :approov_token_empty}
-  end
-
-  defp _has_expiration_claim?(%JOSE.JWT{fields: %{"exp" => _exp}}), do: true
-  defp _has_expiration_claim?(_approov_token_claims), do: false
-
-  defp _verify_expiration(%JOSE.JWT{fields: %{"exp" => timestamp}}) do
-    datetime = _timestamp_to_datetime(timestamp)
-    now = DateTime.utc_now()
-
-    case DateTime.compare(now, datetime) do
-      :lt ->
-        :ok
-
-      _ ->
-        {:error, :approov_token_expired}
-    end
-  end
-
-  defp _timestamp_to_datetime(timestamp) when is_integer(timestamp) do
-    DateTime.from_unix!(timestamp)
-  end
-
-  defp _timestamp_to_datetime(timestamp) when is_float(timestamp) do
-    # iex> Integer.parse "1555083349.3777623"
-    # {1555083349, ".3777623"}
-    {timestamp, _decimals} = Integer.parse("#{timestamp}")
-    DateTime.from_unix!(timestamp)
-  end
 end

@@ -23,7 +23,7 @@ defmodule EchoWeb.UserSocket do
     headers = Map.merge(params, connect_info)
 
     # Always perform the Approov token check before the User Authentication.
-    with {:ok, approov_token_claims} <- ApproovToken.verify(headers, _approov_jwk()),
+    with {:ok, approov_token_claims} <- ApproovToken.verify_token(headers),
          :ok <- ApproovToken.verify_token_binding(approov_token_claims, params),
          {:ok, current_user} <- Echo.User.authorize(params: params) do
 
@@ -32,19 +32,7 @@ defmodule EchoWeb.UserSocket do
       {:ok, socket}
     else
       {:error, reason} ->
-        _log_error(reason)
         :error
     end
   end
-
-  defp _approov_jwk() do
-    %{
-      "kty" => "oct",
-      "k" =>  Utils.fetch_from_env!(:echo, ApproovToken, :secret_key, 64, :string)
-    }
-  end
-
-  defp _log_error(reason) when is_atom(reason), do: Logger.warn(Atom.to_string(reason))
-  defp _log_error(reason), do: Logger.warn(reason)
-
 end

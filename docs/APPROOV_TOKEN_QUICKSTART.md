@@ -9,19 +9,19 @@ This quickstart is for developers familiar with Phoenix who are looking for a qu
 * [Requirements](#requirements)
 * [Approov Setup](#approov-setup)
 * [Approov Token Check](#approov-token-check)
-* [Test the Approov Integration](#test-the-approov-integration)
+* [Test the Approov Integration](#test-your-approov-integration)
 
 
 ## Why?
 
-To lock down your Elixir Phoenix Channels server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
+To lock down your Elixir Phoenix Channels server to your mobile app. Please read the brief summary in the [Approov Overview](/OVERVIEW.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 
 
 ## How it works?
 
-For more background on Approov, see the overview in the [README](/README.md#how-it-works) at the root of this repo.
+For more background on Approov, see the [Approov Overview](/OVERVIEW.md#how-it-works) at the root of this repo.
 
 ### Approov Token Check
 
@@ -63,7 +63,13 @@ Adding the API domain also configures the [dynamic certificate pinning](https://
 
 Approov tokens are signed with a symmetric secret. To verify tokens, you need to grab the secret using the [Approov secret command](https://approov.io/docs/latest/approov-cli-tool-reference/#secret-command) and plug it into the Elixir Phoenix Channels server environment to check the signatures of the [Approov Tokens](https://www.approov.io/docs/latest/approov-usage-documentation/#approov-tokens) that it processes.
 
-Retrieve the Approov secret with:
+First, enable your Approov `admin` role with:
+
+```bash
+eval `approov role admin`
+````
+
+Next, retrieve the Approov secret with:
 
 ```text
 approov secret -get base64url
@@ -146,118 +152,63 @@ Add the [Approov Token](/src/approov-protected-server/token-check/echo/lib/appro
 
 ```elixir
 defmodule ApproovToken do
-  require Logger
 
-  def verify(%Plug.Conn{} = conn, %{} = approov_jwk) do
-    with {:ok, approov_token} <- _get_approov_token_header(conn),
-         {:ok, approov_token_claims} <- _verify_approov_token(approov_token, approov_jwk) do
+  use Joken.Config
 
-      {:ok, approov_token_claims}
-    else
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
+  @impl Joken.Config
+  def token_config, do: default_claims(skip: [:aud, :iat, :iss, :jti, :nbf])
 
-  def verify(%{} = params, %{} = approov_jwk) do
+  # Verifies the token from an HTTP request or from a Websockets connection/event
+  def verify_token(params) do
     with {:ok, approov_token} <- _get_approov_token(params),
-         {:ok, approov_token_claims} <- _verify_approov_token(approov_token, approov_jwk) do
+         {:ok, approov_token_claims} <- _decode_and_verify(approov_token) do
 
       {:ok, approov_token_claims}
     else
       {:error, reason} ->
+        # You may want to add logging here
         {:error, reason}
     end
   end
 
-  defp _get_approov_token_header(conn) do
+
+  ########################
+  # APPROOV TOKEN FETCH
+  ########################
+
+  # For when the Approov token is the header of a regular HTTP Request
+  defp _get_approov_token(%Plug.Conn{} = conn) do
     case Plug.Conn.get_req_header(conn, "x-approov-token") do
       [] ->
-        Logger.info("Approov token not in the headers. Next, try to retrieve from url query params.")
         _get_approov_token(conn.params)
 
       [approov_token | _] ->
-
         {:ok, approov_token}
     end
   end
 
-  defp _get_approov_token(%{x_headers: x_headers})
-    when is_list(x_headers) and length(x_headers) > 0
-  do
-    case Utils.filter_list_of_tuples(x_headers, "x-approov-token") do
-      nil ->
-        {:ok, Utils.filter_list_of_tuples(x_headers, "X-Approov-Token")}
-
-      approov_token ->
-        {:ok, approov_token}
-    end
-  end
-
+  # Fetch for a Phoenix Channel event, where the token is provided in the event payload.
   defp _get_approov_token(%{"x-approov-token" => approov_token}), do: {:ok, approov_token}
   defp _get_approov_token(%{"X-Approov-Token" => approov_token}), do: {:ok, approov_token}
-  defp _get_approov_token(_params), do: {:error, :missing_approov_token}
 
-  defp _verify_approov_token(approov_token, approov_jwk) do
-    with {:ok, approov_token_claims} <- _decode_and_verify(approov_token, approov_jwk),
-         true <- _has_expiration_claim?(approov_token_claims),
-         :ok <- _verify_expiration(approov_token_claims) do
-      {:ok, approov_token_claims}
-    else
-      {:error, reason} ->
-        {:error, reason}
-
-      false ->
-        {:error, :approov_token_missing_expiration_claim}
-    end
+  # Catch failure to fetch the Approov token from the WebSocket upgrade request
+  # or from the Phoenix Channel event.
+  defp _get_approov_token(_params) do
+    {:error, :missing_approov_token}
   end
 
-  defp _decode_and_verify(approov_token, approov_jwk)
-    when is_binary(approov_token) and byte_size(approov_token) > 0
-  do
-    case JOSE.JWT.verify_strict(approov_jwk, ["HS256"], approov_token) do
-      {true, approov_token_claims, _jws} ->
-        {:ok, approov_token_claims}
 
-      {false, _approov_token_claims, _jws} ->
-        {:error, :approov_token_invalid_signature}
+  ########################
+  # APPROOV TOKEN CHECK
+  ########################
 
-      {:error, {:badarg, _arg} = _reason} ->
-        {:error, :approov_token_malformed}
+  defp _decode_and_verify(approov_token) do
+    secret = Application.fetch_env!(:echo, ApproovToken)[:secret_key]
 
-      {:error, _reason} ->
-        {:error, :jwt_library_internal_error}
-    end
+    # call `verify_and_validate/2` injected by `use Joken.Config`
+    verify_and_validate(approov_token, Joken.Signer.create("HS256", secret))
   end
 
-  defp _decode_and_verify(_approov_token, _approov_jwk) do
-    {:error, :approov_token_empty}
-  end
-
-  defp _has_expiration_claim?(%JOSE.JWT{fields: %{"exp" => _exp}}), do: true
-  defp _has_expiration_claim?(_approov_token_claims), do: false
-
-  defp _verify_expiration(%JOSE.JWT{fields: %{"exp" => timestamp}}) do
-    datetime = _timestamp_to_datetime(timestamp)
-    now = DateTime.utc_now()
-
-    case DateTime.compare(now, datetime) do
-      :lt ->
-        :ok
-
-      _ ->
-        {:error, :approov_token_expired}
-    end
-  end
-
-  defp _timestamp_to_datetime(timestamp) when is_integer(timestamp) do
-    DateTime.from_unix!(timestamp)
-  end
-
-  defp _timestamp_to_datetime(timestamp) when is_float(timestamp) do
-    {timestamp, _decimals} = Integer.parse("#{timestamp}")
-    DateTime.from_unix!(timestamp)
-  end
 end
 ```
 
@@ -267,44 +218,22 @@ First, add the [Approov Token Plug](/src/approov-protected-server/token-check/ec
 
 ```elixir
 defmodule YourAppWeb.ApproovTokenPlug do
-  require Logger
 
-  ##############################################################################
-  # Adhere to the Phoenix Module Plugs specification by implementing:
-  #   * init/1
-  #   * call/2
-  #
-  # @link https://hexdocs.pm/phoenix/plug.html#module-plugs
-  ##############################################################################
-
-  # Don't use this function to init the Plug with the Approov secret, because
-  # this is only evaluated at compile time, and we don't want the to have
-  # secrets inside a release. Secrets must always be retrieved from the
-  # environment where the release is running.
+  @impl true
   def init(opts), do: opts
 
+  @impl true
   def call(conn, _opts) do
+    case ApproovToken.verify_token(conn) do
+      {:ok, approov_token_claims} ->
+        conn
+        |> Plug.Conn.put_private(:echo_approov_token_claims, approov_token_claims)
 
-    # Check the `init/1` comment to see why we don't do it there.
-    approov_jwk = %{
-      "kty" => "oct",
-      "k" =>  Application.fetch_env!(:your_app, ApproovToken)[secret_key]
-    }
-
-    with {:ok, approov_token_claims} <- ApproovToken.verify(conn, approov_jwk) do
-      conn
-      |> Plug.Conn.put_private(:approov_token_claims, approov_token_claims)
-    else
       {:error, reason} ->
-        _log_error(reason)
-
         conn
         |> _halt_connection()
     end
   end
-
-  defp _log_error(reason) when is_atom(reason), do: Logger.warn(Atom.to_string(reason))
-  defp _log_error(reason), do: Logger.warn(reason)
 
   defp _halt_connection(conn) do
     conn
@@ -312,8 +241,8 @@ defmodule YourAppWeb.ApproovTokenPlug do
     |> Phoenix.Controller.json(%{})
     |> Plug.Conn.halt()
   end
-end
 
+end
 ```
 
 > **NOTE:** When the Approov token validation fails we return a `401` with an empty body, because we don't want to give clues to an attacker about the reason the request failed, and you can go even further by returning a `400`.
@@ -321,21 +250,35 @@ end
 Now, create and use the pipeline for the Approov token check at `lib/your_app_web/router.ex`:
 
 ```elixir
+# @IMPORTANT:
+#
+# Ideally any other type of Authentication pipeline should only come after the
+# Approov token. For example, doesn't make sense to check the user credentials
+# before you check if you can trust in the request with the Approov Token plug.
+#
+# Also, you may not want to add any other Plug before the Approov Token plug to
+# avoid your server from wasting resources in processing requests not having
+# a valid Approov token.
+#
+# Following this advice's increases availability for your users during peak
+# time or in the event of a DoS attack, because your server is refusing the
+# connection without further processing other paths in your code. We all know
+# that the BEAM design allows to cope and be more resilient to this scenarios,
+# but doesn't hurt to play on the safe side.
+
 pipeline :approov_token do
-  # Ideally you will not want to add any other Plug before the Approov Token
-  # check to protect your server from wasting resources in processing requests
-  # not having a valid Approov token. This increases availability for your
-  # users during peak time or in the event of a DoS attack(We all know the
-  # BEAM design allows to cope very well with this scenarios, but best to play
-  # in the safe side).
   plug YourAppWeb.ApproovTokenPlug
 end
 
 scope "/" do
+
+  # The API pipeline is an exception to the above advice because it's setting
+  # the response content type to JSON.
   pipe_through :api
   pipe_through :approov_token
 
   # Your endpoints go after this line, for example:
+  get "/", YourAppWeb, YourAppWeb.ApiController, :index
   post "/auth/register", YourAppWeb.AuthController, :register
   post "/auth/login", YourAppWeb.AuthController, :login
 end
@@ -346,7 +289,7 @@ end
 
 For using Websockets in Elixir we have the excellent [Phoenix Channels](https://hexdocs.pm/phoenix/channels.html) abstraction provided by the Phoenix framework, that we can easily secure with Approov.
 
-First, open the file where you establish the websocket connection, maybe `lib/your-app/user_socket.ex` or whatever file name you use, and add to it this code:
+First, open the file where you establish the websocket connection, maybe `lib/your_app_web/user_socket.ex` or whatever file name you use, and add to it this code:
 
 ```elixir
 defp _authorize(socket, params, connect_info) do
@@ -354,24 +297,16 @@ defp _authorize(socket, params, connect_info) do
   headers = Map.merge(params, connect_info)
 
   # Always perform the Approov token check before the User Authentication.
-  with {:ok, _approov_token_claims} <- ApproovToken.verify(headers, _approov_jwk()),
+  with {:ok, _approov_token_claims} <- ApproovToken.verify_token(headers),
        {:ok, current_user} <- Echo.User.authorize(params: params) do
 
     socket = Phoenix.Socket.assign(socket, context: %{current_user: current_user})
 
     {:ok, socket}
   else
-    {:error, _reason} ->
-      # log here the error as you see fit.
+    {:error, reason} ->
       :error
   end
-end
-
-defp _approov_jwk() do
-  %{
-    "kty" => "oct",
-    "k" =>  Utils.fetch_from_env!(:your_app, ApproovToken, :secret_key, 64, :string)
-  }
 end
 ```
 
@@ -391,34 +326,24 @@ Next, you need to secure each event coming through the websocket via a Phoenix C
 
 ```elixir
 defp _authorized(action, payload, socket) do
-  Logger.info(%{phoenix_channel_action: action})
-  Logger.info(%{phoenix_channel_payload: payload})
-
-  # Always perform the Approov token check before the User Authentication.
-  with {:ok, _approov_token_claims} <- ApproovToken.verify(payload, _approov_jwk()),
-       {:ok, current_user} <- Echo.User.authorize(params: payload),
-       true <- Echo.User.can_do_action?(action, current_user) do
+  # Always perform the Approov token check before the User Authorization.
+  with {:ok, _approov_token_claims} <- ApproovToken.verify_token(payload),
+       {:ok, current_user} <- YourApp.User.authorize(params: payload),
+       true <- YourApp.User.can_do_action?(action, current_user) do
     {:ok, socket}
   else
-    {:error, _reason} ->
-      # log here the error as you see fit.
+    {:error, reason} ->
+      # You may want to add some logging here
       :error
 
     false ->
-      # log here the error as you see fit.
+      # You may want to add some logging here
       :error
   end
 end
-
-defp _approov_jwk() do
-  %{
-    "kty" => "oct",
-    "k" =>  Utils.fetch_from_env!(:echo, ApproovToken, :secret_key, 64, :string)
-  }
-end
 ```
 
-Now, in the `join/3` function and in each `handle_in/3` function of your Phoenix Channel module you need to wrap all you logic in a call to `_authorized/3`:
+Now, in the `join/3` function and in each `handle_in/3` function of your Phoenix Channel module you need to wrap all your logic in a call to `_authorized/3`:
 
 ```elixir
 def join("channel:event", payload, socket) do
@@ -453,7 +378,7 @@ A full working example for a simple Elixir Phoenix Channels server can be found 
 [TOC](#toc---table-of-contents)
 
 
-## Test the Approov Integration
+## Test your Approov Integration
 
 In this section you will see how you can use the Approov CLI to generate sample Approov tokens to test your Approov Integration in the backend without relying in the Mobile App(s) that the backend will be serving.
 

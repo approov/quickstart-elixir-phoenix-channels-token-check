@@ -15,7 +15,7 @@ This Approov integration example is from where the code example for the [Approov
 
 ## Why?
 
-To lock down your Phoenix Channels server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
+To lock down your Phoenix Channels server to your mobile app. Please read the brief summary in the [Approov Overview](/OVERVIEW.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 
@@ -30,7 +30,7 @@ The server only replies to Phoenix Channels websocket connections and to the `au
 
 Take a look at the [Approov Token Plug](/src/approov-protected-server/token-binding-check/echo/lib/echo_web/plugs/approov_token_plug.ex) module to see how the Approov token check is invoked in the `call/2` function. To see the simple code for the Approov token check, you need to look into the `verify/1` function in the [Approov Token](/src/approov-protected-server/token-binding-check/echo/lib/approov_token.ex) module.
 
-For more background on Approov, see the overview in the [README](/README.md#how-it-works) at the root of this repo.
+For more background on Approov, see the [Approov Overview](/OVERVIEW.md#how-it-works) at the root of this repo.
 
 ### Approov Token Binding Check
 

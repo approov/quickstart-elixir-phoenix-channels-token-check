@@ -14,7 +14,7 @@ The unprotected example is the base reference to build the [Approov protected se
 
 ## Why?
 
-To be the starting building block for the [Approov protected servers](/src/approov-protected-server/echo), that will show you how to lock down your API server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
+To be the starting building block for the [Approov protected servers](/src/approov-protected-server/echo), that will show you how to lock down your API server to your mobile app. Please read the brief summary in the [Approov Overview](/OVERVIEW.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 

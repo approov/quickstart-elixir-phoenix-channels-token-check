@@ -25,8 +25,7 @@ url_public_port = load_from_env.("URL_PUBLIC_PORT", "443")
 url_public = "#{url_public_scheme}://#{url_public_host}"
 
 config :echo, ApproovToken,
-  # secret_key: Base.decode64!(load_from_env.("APPROOV_BASE64URL_SECRET", nil), ignore: :whitespace)
-  secret_key: load_from_env.("APPROOV_BASE64URL_SECRET", nil)
+  secret_key: load_from_env.("APPROOV_BASE64URL_SECRET", nil) |> Base.url_decode64!()
 
 # ## Using releases (Elixir v1.9+)
 #
