@@ -296,6 +296,10 @@ Not enough details in the bare bones quickstart? No worries, check the [detailed
 * [Step by Step Examples](EXAMPLES.md)
 * [Testing](TESTING.md)
 
+### System Clock
+
+In order to correctly check for the expiration times of the Approov tokens is very important that the backend server is synchronizing automatically the system clock over the network with an authoritative time source. In Linux this is usually done with a NTP server.
+
 
 ## Issues
 
