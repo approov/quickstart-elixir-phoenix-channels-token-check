@@ -54,10 +54,12 @@ config :YOUR_APP, ApproovToken,
   secret_key: approov_secret
 ```
 
-Next, add the [JWT dependency](https://github.com/potatosalad/erlang-jose) to your `mix.exs` file:
+Next, add the [JWT dependency](https://github.com/joken-elixir/joken) to your `mix.exs` file:
 
 ```elixir
-{:jose, "~> 1.11"},
+{:joken, "~> 2.4"},
+# Recommended JSON library
+{:jason, "~> 1.2"}
 ```
 
 Fetch the new dependency:
@@ -124,7 +126,18 @@ defmodule ApproovToken do
     secret = Application.fetch_env!(:echo, ApproovToken)[:secret_key]
 
     # call `verify_and_validate/2` injected by `use Joken.Config`
-    verify_and_validate(approov_token, Joken.Signer.create("HS256", secret))
+    case verify_and_validate(approov_token, Joken.Signer.create("HS256", secret)) do
+      {:ok, %{"exp" => _expiration}} = result ->
+        result
+
+      # The library only checks the `exp` when present, and verifies successfully
+      # without it, and doesn't have an option to enforce it.
+      {:ok, _claims} ->
+        {:error, :missing_expiration_time}
+
+      result ->
+        result
+    end
   end
 
 end
@@ -137,17 +150,15 @@ First, add this simple Approov Token plug to your project. For example at `lib/y
 ```elixir
 defmodule YourAppWeb.ApproovTokenPlug do
 
-  @impl true
   def init(opts), do: opts
 
-  @impl true
   def call(conn, _opts) do
     case ApproovToken.verify_token(conn) do
       {:ok, approov_token_claims} ->
         conn
         |> Plug.Conn.put_private(:echo_approov_token_claims, approov_token_claims)
 
-      {:error, reason} ->
+      {:error, _reason} ->
         conn
         |> _halt_connection()
     end
@@ -221,7 +232,7 @@ defp _authorize(socket, params, connect_info) do
 
     {:ok, socket}
   else
-    {:error, reason} ->
+    {:error, _reason} ->
       :error
   end
 end
@@ -249,7 +260,7 @@ defp _authorized(action, payload, socket) do
        {:ok, current_user} <- YourApp.User.authorize(params: payload),
     {:ok, socket}
   else
-    {:error, reason} ->
+    {:error, _reason} ->
       # You may want to add some logging here
       :error
   end

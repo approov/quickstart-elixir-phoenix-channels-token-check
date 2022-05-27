@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - 127.0.0.1:${HTTP_INTERNAL_PORT}:${HTTP_INTERNAL_PORT}
+      - ${LOCALHOST_IP:-127.0.0.1}:${HTTP_INTERNAL_PORT}:${HTTP_INTERNAL_PORT}
     networks:
       - traefik
       - default

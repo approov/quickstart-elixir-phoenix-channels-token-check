@@ -8,17 +8,15 @@ defmodule EchoWeb.ApproovTokenPlug do
   # @link https://hexdocs.pm/phoenix/plug.html#module-plugs
   ##############################################################################
 
-  @impl true
   def init(opts), do: opts
 
-  @impl true
   def call(conn, _opts) do
     case ApproovToken.verify_token(conn) do
       {:ok, approov_token_claims} ->
         conn
         |> Plug.Conn.put_private(:echo_approov_token_claims, approov_token_claims)
 
-      {:error, reason} ->
+      {:error, _reason} ->
         conn
         |> _halt_connection()
     end

@@ -66,13 +66,17 @@ Adding the API domain also configures the [dynamic certificate pinning](https://
 
 Approov tokens are signed with a symmetric secret. To verify tokens, you need to grab the secret using the [Approov secret command](https://approov.io/docs/latest/approov-cli-tool-reference/#secret-command) and plug it into the Elixir Phoenix Channels server environment to check the signatures of the [Approov Tokens](https://www.approov.io/docs/latest/approov-usage-documentation/#approov-tokens) that it processes.
 
-Retrieve the Approov secret with:
+First, enable your Approov `admin` role with:
+
+```bash
+eval `approov role admin`
+````
+
+Next, retrieve the Approov secret with:
 
 ```text
 approov secret -get base64url
 ```
-
-> **NOTE:** The `approov secret` command requires an [administration role](https://approov.io/docs/latest/approov-usage-documentation/#account-access-roles) to execute successfully.
 
 #### Set the Approov Secret
 
@@ -96,7 +100,7 @@ approov_secret =
     raise "Environment variable APPROOV_BASE64URL_SECRET is missing."
 
 config :YOUR_APP, ApproovToken,
-  secret_key: approov_secret
+  secret_key: approov_secret |> Base.url_decode64!(padding: false)
 ```
 
 The runtime configuration will run every-time a release or a Mix project is started.
@@ -117,7 +121,7 @@ approov_secret =
     raise "Environment variable APPROOV_BASE64URL_SECRET is missing."
 
 config :YOUR_APP, ApproovToken,
-  secret_key: approov_secret
+  secret_key: approov_secret |> Base.url_decode64!(padding: false)
 
 config :YOUR_APP, YOUR_APP.Endpoint, server: true
 ```
@@ -143,7 +147,7 @@ Until Elixir `1.8` version no official way existed of reading values for each ti
 
 ## Approov Token Check
 
-For protecting HTTP requests and/or Websocket requests you need to add the Approov token module to perform the token check, that will use the [potatosalad/erlang-jose](https://github.com/potatosalad/erlang-jose) package to verify the token signature, and a custom function to check the expiration time for it.
+For protecting HTTP requests and/or Websocket requests you need to add the Approov token module to perform the token check, that will use the [joken-elixir/joken](httpshttps://github.com/joken-elixir/joken) package to verify the token signature, and a custom function to check the expiration time for it.
 
 Add the [Approov Token](/src/approov-protected-server/token-binding-check/echo/lib/approov_token.ex) module into your project at `lib/approov_token.ex`:
 
@@ -205,7 +209,18 @@ defmodule ApproovToken do
     secret = Application.fetch_env!(:echo, ApproovToken)[:secret_key]
 
     # call `verify_and_validate/2` injected by `use Joken.Config`
-    verify_and_validate(approov_token, Joken.Signer.create("HS256", secret))
+    case verify_and_validate(approov_token, Joken.Signer.create("HS256", secret)) do
+      {:ok, %{"exp" => _expiration}} = result ->
+        result
+
+      # The library only checks the `exp` when present, and verifies successfully
+      # without it, and doesn't have an option to enforce it.
+      {:ok, _claims} ->
+        {:error, :missing_expiration_time}
+
+      result ->
+        result
+    end
   end
 
 
@@ -287,17 +302,15 @@ First, add the [Approov Token Plug](/src/approov-protected-server/token-binding-
 ```elixir
 defmodule YourAppWeb.ApproovTokenPlug do
 
-  @impl true
   def init(opts), do: opts
 
-  @impl true
   def call(conn, _opts) do
     case ApproovToken.verify_token(conn) do
       {:ok, approov_token_claims} ->
         conn
         |> Plug.Conn.put_private(:echo_approov_token_claims, approov_token_claims)
 
-      {:error, reason} ->
+      {:error, _reason} ->
         conn
         |> _halt_connection()
     end
@@ -320,16 +333,14 @@ Next, add the [Approov Token Binding Plug](/src/approov-protected-server/token-b
 ```elixir
 defmodule YourAppWeb.ApproovTokenBindingPlug do
 
-  @impl true
   def init(opts), do: opts
 
-  @impl true
   def call(conn, _opts) do
     case ApproovToken.verify_token_binding(conn) do
       :ok ->
         conn
 
-      {:error, reason} ->
+      {:error, _reason} ->
         conn
         |> _halt_connection()
     end
@@ -415,7 +426,7 @@ defp _authorize(socket, params, connect_info) do
 
       {:ok, socket}
     else
-      {:error, reason} ->
+      {:error, _reason} ->
         # You may want to log here
         :error
     end
@@ -446,7 +457,7 @@ defp _authorized(action, payload, socket) do
        true <- Echo.User.can_do_action?(action, current_user) do
     {:ok, socket}
   else
-    {:error, reason} ->
+    {:error, _reason} ->
       # You may want to log here
       :error
 

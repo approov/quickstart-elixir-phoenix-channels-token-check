@@ -31,7 +31,7 @@ defmodule EchoWeb.UserSocket do
 
       {:ok, socket}
     else
-      {:error, reason} ->
+      {:error, _reason} ->
         :error
     end
   end

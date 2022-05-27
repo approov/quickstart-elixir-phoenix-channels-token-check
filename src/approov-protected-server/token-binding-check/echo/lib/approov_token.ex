@@ -57,7 +57,18 @@ defmodule ApproovToken do
     secret = Application.fetch_env!(:echo, ApproovToken)[:secret_key]
 
     # call `verify_and_validate/2` injected by `use Joken.Config`
-    verify_and_validate(approov_token, Joken.Signer.create("HS256", secret))
+    case verify_and_validate(approov_token, Joken.Signer.create("HS256", secret)) do
+      {:ok, %{"exp" => _expiration}} = result ->
+        result
+
+      # The library only checks the `exp` when present, and verifies successfully
+      # without it, and doesn't have an option to enforce it.
+      {:ok, _claims} ->
+        {:error, :missing_expiration_time}
+
+      result ->
+        result
+    end
   end
 
 
