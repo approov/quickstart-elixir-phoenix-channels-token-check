@@ -29,6 +29,12 @@ Next, enable your Approov `admin` role with:
 eval `approov role admin`
 ````
 
+For the Windows powershell:
+
+```bash
+set APPROOV_ROLE=admin:___YOUR_APPROOV_ACCOUNT_NAME_HERE___
+````
+
 Now, retrieve the [Approov secret](https://approov.io/docs/latest/approov-usage-documentation/#account-secret-key-export):
 
 ```bash

@@ -72,6 +72,12 @@ First, enable your Approov `admin` role with:
 eval `approov role admin`
 ````
 
+For the Windows powershell:
+
+```bash
+set APPROOV_ROLE=admin:___YOUR_APPROOV_ACCOUNT_NAME_HERE___
+````
+
 Next, retrieve the Approov secret with:
 
 ```text
