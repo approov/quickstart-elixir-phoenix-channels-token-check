@@ -51,8 +51,8 @@ Approov needs to know the domain name of the API for which it will issue tokens.
 
 Add it with:
 
-```bash
-approov api -add api.example.com
+```text
+approov api -add your.api.domain.com
 ```
 
 > **NOTE:** By default a symmetric key (HS256) is used to sign the Approov token on a valid attestation of the mobile app for each API domain it's added with the Approov CLI, so that all APIs will share the same secret and the backend needs to take care to keep this secret secure.
