@@ -23,6 +23,12 @@ Now, register the API domain for which Approov will issues tokens:
 approov api -add api.example.com
 ```
 
+> **NOTE:** By default a symmetric key (HS256) is used to sign the Approov token on a valid attestation of the mobile app for each API domain it's added with the Approov CLI, so that all APIs will share the same secret and the backend needs to take care to keep this secret secure.
+
+> A more secure alternative is to use asymmetric keys (RS256 or others) that allows for a different keyset to be used on each API domain and for the Approov token to be verified with a public key that can only verify, but not sign, Approov tokens.
+
+> To implement the asymmetric key you need to change from using the symmetric HS256 algorithm to an asymmetric algorithm, for example RS256, that requires you to first add a new key, and then specify it when adding each API domain. Please visit Managing Key Sets on the Approov documentation for more details.
+
 Next, enable your Approov `admin` role with:
 
 ```bash
