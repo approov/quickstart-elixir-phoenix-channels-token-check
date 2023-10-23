@@ -40,7 +40,7 @@ iex> Echo.Repo.all! :users
 ]
 ```
 
-You can check by yourself how this is done at `src/approov-protected-server/token-check/echo/lib/echo/user.ex`, and we hope that this approach gives you enough peace of mind when playing around with the [Echo Chamber mobile app](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/master/src/echo-chamber-app) that may use this server at `https://token.phoenix-channels.demo.approov.io`.
+You can check by yourself how this is done at `src/approov-protected-server/token-check/echo/lib/echo/user.ex`, and we hope that this approach gives you enough peace of mind when playing around with the [Echo Chamber mobile app](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/main/src/echo-chamber-app) that may use this server at `https://token.phoenix-channels.demo.approov.io`.
 
 [TOC](#toc---table-of-contents)
 
@@ -211,7 +211,7 @@ Next, create a Postman environment and add to it the variable `AUTHORIZATION_TOK
 
 Finally, you are ready to connect to the `echo:chamber` Phoenix channel for sending messages to it.
 
-### Phoenix Channel Websosocket Requests
+### Phoenix Channel Websocket Requests
 
 In this section you will use Postman to connect to the Phoenix Channel and for sending messages to it.
 
@@ -305,7 +305,7 @@ Being able to test the Phoenix Channels websocket from Postman isn't the only op
 
 ## Testing with a Mobile App
 
-To test the echo chamber functionality, that uses Phoenix channels via websockets, you need to follow [this instructions](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/master/ECHO-CHAMBER-EXAMPLE.md#try-the-echo-chamber-app-without-approov) to run the Echo Chamber mobile app example for this backend.
+To test the echo chamber functionality, that uses Phoenix channels via websockets, you need to follow [this instructions](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/main/ECHO-CHAMBER-EXAMPLE.md#try-the-echo-chamber-app-without-approov) to run the Echo Chamber mobile app example for this backend.
 
 
 [TOC](#toc---table-of-contents)

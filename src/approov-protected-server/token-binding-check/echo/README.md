@@ -60,7 +60,7 @@ iex> Echo.Repo.all! :users
 ]
 ```
 
-You can check by yourself how this is done at `src/approov-protected-server/token-binding-check/echo/lib/echo/user.ex`, and we hope that this approach gives you enough peace of mind while playing around with the [Echo Chamber](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/master/src/echo-chamber-app) mobile app when its using our online server at `https://token.phoenix-channels.demo.approov.io`.
+You can check by yourself how this is done at `src/approov-protected-server/token-binding-check/echo/lib/echo/user.ex`, and we hope that this approach gives you enough peace of mind while playing around with the [Echo Chamber](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/main/src/echo-chamber-app) mobile app when its using our online server at `https://token.phoenix-channels.demo.approov.io`.
 
 [TOC](#toc---table-of-contents)
 
@@ -254,7 +254,7 @@ A Postman collection cannot be provided (at the time of writing), because Postma
 
 Finally, you are now ready to start creating your websocket request to connect to the `echo:chamber` Phoenix channel for  sending messages to it.
 
-### Phoenix Channel Websosocket - Valid Requests
+### Phoenix Channel Websocket - Valid Requests
 
 In this section you will use Postman to connect to the Phoenix Channel and for sending messages to it.
 
@@ -388,7 +388,7 @@ To customize the message you need to find the key `payload > message` on the JSO
 }
 ```
 
-### Phoenix Channel Websosocket - Invalid Requests
+### Phoenix Channel Websocket - Invalid Requests
 
 Until now you have connected to the Phoenix Channel websocket with valid Approov tokens, but I now challenge you to try out other requests for failure scenarios:
 
@@ -407,7 +407,7 @@ Being able to test the Phoenix Channels websocket from Postman isn't the only op
 
 ## Testing with a Mobile App
 
-To test the echo chamber functionality, that uses Phoenix channels via websockets, you need to follow [this instructions](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/master/ECHO-CHAMBER-EXAMPLE.md#try-the-echo-chamber-app-without-approov) to run the Echo Chamber mobile app example for this backend.
+To test the echo chamber functionality, that uses Phoenix channels via websockets, you need to follow [this instructions](https://github.com/approov/quickstart-flutter-elixir-phoenix-channels/blob/main/ECHO-CHAMBER-EXAMPLE.md#try-the-echo-chamber-app-without-approov) to run the Echo Chamber mobile app example for this backend.
 
 
 [TOC](#toc---table-of-contents)

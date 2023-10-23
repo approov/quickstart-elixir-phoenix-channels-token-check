@@ -671,7 +671,7 @@ Go ahead and try to repeat the request, but this time do not send the Authorizat
 
 Phoenix Channels cannot be tested using cURL, because you need to establish a websocket connection and keep it open, therefore you will need to use Postman or another software that supports websockets.
 
-We recommend the use of Postman and we provide [this collection](https://raw.githubusercontent.com/approov/postman-collections/master/quickstarts/echo/echo-websockets.postman_collection.json) to help you get started.
+We recommend the use of Postman and we provide [this collection](https://raw.githubusercontent.com/approov/postman-collections/main/quickstarts/echo/echo-websockets.postman_collection.json) to help you get started.
 
 You can check [this examples](./../src/approov-protected-server/token-binding-check/echo/README.md#testing-with-postman) to see a practical example of this collection being used. Remember that when following this Postman examples you need to generate the Approov tokens with the Approov CLI, or use the same Approov secret from the examples.
 

@@ -1,6 +1,6 @@
 FROM approov/quickstart-elixir-phoenix
 
-ARG GIT_CHECKOUT_TO=master
+ARG GIT_CHECKOUT_TO=main
 ARG SERVER_NAME=unprotected-server
 ARG GIT_CLONE_URL=https://github.com/approov/quickstart-elixir-phoenix-channels-token-check.git
 
