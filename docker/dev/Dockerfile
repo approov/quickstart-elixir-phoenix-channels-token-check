@@ -51,7 +51,6 @@ RUN apt update && \
         inotify-tools \
         build-essential \
         libnss3-tools \
-        lib32stdc++6 \
         zip \
         zsh \
         curl \

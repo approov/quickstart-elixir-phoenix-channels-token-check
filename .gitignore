@@ -1,3 +1,6 @@
 .env
 .editor.vars
 .elixir-docker-stack-defaults
+
+# OS-specific files
+.DS_Store
