@@ -1,4 +1,4 @@
-FROM approov/quickstart-elixir-phoenix
+FROM approov/quickstart-elixir-phoenix-channels
 
 ARG GIT_CHECKOUT_TO=main
 ARG SERVER_NAME=unprotected-server
