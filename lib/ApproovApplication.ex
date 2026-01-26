@@ -82,7 +82,7 @@ defmodule ApproovQuickstart.ApproovToken do
       {:ok, claims}
     else
       {:error, reason} ->
-        Logger.info(%{approov_token_error: reason})
+        Logger.debug(%{approov_token_error: reason})
         {:error, reason}
     end
   end
@@ -93,7 +93,7 @@ defmodule ApproovQuickstart.ApproovToken do
       :ok
     else
       {:error, reason} ->
-        Logger.info(%{approov_binding_error: reason})
+        Logger.debug(%{approov_binding_error: reason})
         {:error, reason}
     end
   end
@@ -174,7 +174,7 @@ defmodule ApproovQuickstartWeb do
 
   def controller do
     quote do
-      use Phoenix.Controller, namespace: ApproovQuickstartWeb, formats: [:json]
+      use Phoenix.Controller, formats: [:json]
       import Plug.Conn
       plug :accepts, ["json"]
     end
@@ -285,7 +285,6 @@ defmodule ApproovQuickstartWeb.Endpoint do
     longpoll: false
 
   plug Plug.RequestId
-  plug Plug.Logger
 
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
