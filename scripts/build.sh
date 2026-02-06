@@ -36,6 +36,10 @@ if in_container; then
   if [[ -n "$RUNTIME_BIN_DIR" ]]; then
     export PATH="${RUNTIME_BIN_DIR}:$PATH" # e.g., RUNTIME_BIN_DIR=/usr/local/go/bin to expose runtime binaries for golang
   fi
+  # Allow Docker env-file values that require quotes for dotenv parsers.
+  if [[ "$APP_START_CMD" =~ ^\".*\"$ ]] || [[ "$APP_START_CMD" =~ ^\'.*\'$ ]]; then
+    APP_START_CMD="${APP_START_CMD:1:-1}"
+  fi
   info "Container starting application: ${APP_START_CMD}"
   exec bash -c "$APP_START_CMD"
 fi

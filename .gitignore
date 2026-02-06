@@ -7,4 +7,6 @@
 .DS_Store
 _build
 deps
-mix.lock
+.elixir_ls
+.idea
+.vscode

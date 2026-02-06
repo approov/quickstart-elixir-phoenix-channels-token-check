@@ -322,13 +322,13 @@ main() {
 		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_invalid")" \
 		"${BASE_URL}/token-binding"
 
-	# 3) Token Binding ["Authorization", "Content-Digest"].
+	# 3) Token Binding ["Authorization", "SessionId"].
 	local AUTH_VAL2="ExampleAuthToken=="
-	local CD_VAL="ContentDigest=="
-	export HASH_INPUT="${AUTH_VAL2}${CD_VAL}"
+	local SI_VAL="123"
+	export HASH_INPUT="${AUTH_VAL2}${SI_VAL}"
 
 	gen_token \
-		"${TOKDIR}/approov_token_bind_auth_cd_valid" \
+		"${TOKDIR}/approov_token_bind_auth_si_valid" \
 		-setDataHashInToken "${HASH_INPUT}" \
 		-genExample \
 		example.com
@@ -338,15 +338,15 @@ main() {
 		"Double Binding - valid token and headers" \
 		"${success_code}" \
 		-H "Authorization: ${AUTH_VAL2}" \
-		-H "Content-Digest: ${CD_VAL}" \
-		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_cd_valid")" \
+		-H "SessionId: ${SI_VAL}" \
+		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_si_valid")" \
 		"${BASE_URL}/token-double-binding"
 
 	# 3.2) Missing headers.
 	run_test \
 		"Double Binding - missing binding headers" \
 		"${failure_code}" \
-		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_cd_valid")" \
+		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_si_valid")" \
 		"${BASE_URL}/token-double-binding"
 
 	# 3.3) Incorrect headers.
@@ -354,13 +354,13 @@ main() {
 		"Double Binding - incorrect binding headers" \
 		"${failure_code}" \
 		-H "Authorization: BadAuthToken==" \
-		-H "Content-Digest: BadContentDigest==" \
-		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_cd_valid")" \
+		-H "SessionId: Bad123" \
+		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_si_valid")" \
 		"${BASE_URL}/token-double-binding"
 
 	# 3.4) Invalid token.
 	gen_token \
-		"${TOKDIR}/approov_token_bind_auth_cd_invalid" \
+		"${TOKDIR}/approov_token_bind_auth_si_invalid" \
 		-setDataHashInToken "${HASH_INPUT}" \
 		-genExample \
 		example.com \
@@ -370,8 +370,8 @@ main() {
 		"Double Binding - invalid token" \
 		"${failure_code}" \
 		-H "Authorization: ${AUTH_VAL2}" \
-		-H "Content-Digest: ${CD_VAL}" \
-		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_cd_invalid")" \
+		-H "SessionId: ${SI_VAL}" \
+		-H "approov-token: $(<"${TOKDIR}/approov_token_bind_auth_si_invalid")" \
 		"${BASE_URL}/token-double-binding"
 
 	echo

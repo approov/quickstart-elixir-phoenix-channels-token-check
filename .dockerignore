@@ -1,0 +1,11 @@
+.env
+.env.*
+.config
+_build
+deps
+.elixir_ls
+.git
+.gitignore
+.DS_Store
+.idea
+.vscode

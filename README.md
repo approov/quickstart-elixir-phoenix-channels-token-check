@@ -7,28 +7,51 @@ This project provides a server-side example of Approov token verification for a 
  - `/token-binding` - requires a valid Approov token which is bound to a header value.
  - `/token-double-binding` - requires a valid Approov token which is bound to two header values.
 
-In this example:
+## WebSocket (Channels)
 
-- **JWT Approov Token validation (signature + expiry)** is implemented in 
-   [ApproovQuickstart.ApproovToken.verify_token/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L79-L87), reads the `Approov-Token` header via [fetch_approov_token/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L101-L108), and [verify_and_decode/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L111-L123).
+`/socket` requires a valid Approov token. If token binding is enabled, include `authorization` (required) and optionally `sessionid` (double binding when present).
 
-- **Token binding (`pay` + hash)** is handled by
-  [validate_binding/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L154-L162).
-  It computes `Base.encode64(:crypto.hash(:sha256, binding_value))` and compares it to `pay`.
+Example (double binding):
+```text
+ws://localhost:8080/socket/websocket?approov_token=YOUR_TOKEN&authorization=ExampleAuthToken==&sessionid=123
+```
 
-- **Middleware enforcement (token + binding)** is done by
-  [ApproovTokenVerifier.call/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L211-L218).
-  It requires the `Approov-Token` header and returns `401` if the token is missing or invalid.
+Quick test with `wscat` (same URL as above; `=` must be URL-encoded):
+```bash
+wscat -c "ws://localhost:8080/socket/websocket?approov_token=YOUR_TOKEN&authorization=ExampleAuthToken%3D%3D&sessionid=123"
+```
 
-- **Binding value selection (what gets hashed)** is in
-  [extract_binding_value/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L130-L149).
-  It uses `Authorization` for single binding, or `Authorization + Content-Digest` for double binding.
+Then, in the same `wscat` session:
+```json
+{"topic":"echo:lobby","event":"phx_join","payload":{},"ref":1}
+{"topic":"echo:lobby","event":"echo","payload":{"msg":"hi"},"ref":2}
+```
 
-- **Protected route levels** are defined in
+You can also run:
+```bash
+bash ws-test.sh
+```
+This performs a WebSocket smoke test (connect, join, echo) using an Approov token and binding values based on `/approov-state`.
+
+In this example, Approov token check is implemented in `ApproovApplication.ex`. The responsibilities break down as follows:
+
+1. **JWT Approov Token validation (signature + expiry)** is implemented in
+   [verify_token/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L80-L89). It verifies the HS256 signature and rejects tokens that are missing or past `exp` via [verify_and_decode/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L125-L137).
+
+2. **Token binding (`pay` + hash)** is handled by
+  [validate_binding/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L226-L237). It computes `Base.encode64(:crypto.hash(:sha256, binding_value))` and compares it to `pay` with `Plug.Crypto.secure_compare/2`.
+
+3. **Middleware enforcement (token + binding)** is done by
+  [ApproovTokenVerifier.call/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L462-480) for routes in the `:approov_protected` pipeline. Requests without valid token/binding are rejected with `401`.
+
+4. **Binding value selection (what gets hashed)** is in
+  [extract_binding_value/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L192-L219). It uses the header list returned by [binding_headers/1](lib/ApproovApplication.ex#L222-L224), currently `Authorization` for single binding, or `Authorization + SessionId` for double binding.
+
+5. **Protected route requirements** are defined in
   [ProtectedRoutes](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L1-L21).
 
-- **Protected routes are registered** in the router pipeline
-  [:approov_protected](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L253-L275).
+6. **Protected routes are registered** in the
+  [ApproovQuickstartWeb.Router](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L535-L540) scope that runs through the [:approov_protected](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L517-L519).
 
 ## Approov Token Verification Flow
 
@@ -99,7 +122,7 @@ bash test.sh
 This script:
 - Verifies that the `approov` and `curl` commands are installed.
 - Checks Approov status by calling `/approov-state` (enabled vs disabled).
-- Runs endpoint tests against `/unprotected` (no token), `/token-check` (valid/invalid Approov tokens), `/token-binding` (token bound to `Authorization`), and `/token-double-binding` (token bound to `Authorization` + `Content-Digest`).
+- Runs endpoint tests against `/unprotected` (no token), `/token-check` (valid/invalid Approov tokens), `/token-binding` (token bound to `Authorization`), and `/token-double-binding` (token bound to `Authorization` + `SessionId`).
 - Logs full request/response details to `.config/logs/<timestamp>.log`.
 
 #### *1. Unprotected Endpoint (No Approov)*
@@ -196,16 +219,16 @@ Cache-Control: no-cache
 - The client sends three headers on authenticated API calls:
     - `Approov-Token`
     - `Authorization`
-    - `Content-Digest` It is combined with the `Authorization` header to create a stronger binding.
+    - `SessionId` It is combined with the `Authorization` header to create a stronger binding.
 - Both are included in the hash inside the Approov token. This means the server verifies a single hash that covers both authentication credentials.
 - **Use case:** Stronger protection then single binding by tying both headers together.
 
 ***The following example shows how the API responds when an Approov token with two bindings is required.***
 
-*Generate a valid Approov token bound to the `Authorization` and `Content-Digest` headers:*
+*Generate a valid Approov token bound to the `Authorization` and `SessionId` headers:*
 
 ```bash
-approov token -setDataHashInToken ExampleAuthToken==ContentDigest== -genExample example.com
+approov token -setDataHashInToken ExampleAuthToken==123 -genExample example.com
 ```
 
 *Use the generated token with two bindings in the Approov-Token and Authorization headers when calling the `/token-double-binding` endpoint.*
@@ -214,7 +237,7 @@ approov token -setDataHashInToken ExampleAuthToken==ContentDigest== -genExample 
 curl -iX GET http://localhost:8080/token-double-binding \
      -H "Approov-Token: valid_approov_token_here" \
      -H "Authorization: ExampleAuthToken==" \
-     -H "Content-Digest: ContentDigest=="
+     -H "SessionId: 123"
 ```
 
 The response will be `200 OK` for this request.
