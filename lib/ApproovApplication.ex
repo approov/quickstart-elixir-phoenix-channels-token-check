@@ -448,63 +448,239 @@ defmodule ApproovQuickstartWeb.RequestLogger do
   end
 end
 
-defmodule ApproovQuickstartWeb.ApproovTokenVerifier do
+defmodule ApproovQuickstart.ApproovRequestVerifier do
   @moduledoc false
-
-  import Plug.Conn
 
   alias ApproovQuickstart.ApproovState
   alias ApproovQuickstart.ApproovToken
   alias ApproovQuickstart.ProtectedRoutes
 
-  def init(opts), do: opts
+  @type verify_error ::
+          :missing_approov_token
+          | :token_verification_failed
+          | :missing_binding_header
+          | :binding_mismatch
+          | :unsupported_binding_mode
 
-  def call(conn, _opts) do
+  @spec verify_http_request(Plug.Conn.t()) :: {:ok, map()} | {:error, verify_error()} | :skip
+  def verify_http_request(%Plug.Conn{} = conn) do
     if ApproovState.approov_enabled?() do
-      case ApproovToken.verify_token(conn) do
-        {:ok, claims} ->
-          case verify_binding_if_needed(conn, claims) do
-            :ok -> put_private(conn, :approov_token_claims, claims)
-            {:error, reason} -> unauthorized(conn, normalize_failure_reason(reason))
-          end
-
-        {:error, :missing_approov_token} ->
-          unauthorized(conn, :missing_approov_token)
-
-        {:error, _reason} ->
-          unauthorized(conn, :token_verification_failed)
+      with {:ok, claims} <- verify_http_token(conn),
+           :ok <- verify_http_binding(conn, claims) do
+        {:ok, claims}
       end
     else
-      conn
+      :skip
     end
   end
 
-  defp verify_binding_if_needed(conn, claims) do
+  @spec verify_socket_request(map(), map() | nil) :: {:ok, map()} | {:error, verify_error()} | :skip
+  def verify_socket_request(params, connect_info) when is_map(params) do
+    safe_connect_info =
+      if is_map(connect_info) do
+        connect_info
+      else
+        %{}
+      end
+
+    if ApproovState.approov_enabled?() do
+      with {:ok, token} <- fetch_socket_token(params, safe_connect_info),
+           {:ok, claims} <- verify_socket_token(token),
+           :ok <- verify_socket_binding(params, safe_connect_info, claims) do
+        {:ok, claims}
+      end
+    else
+      :skip
+    end
+  end
+
+  defp verify_http_token(conn) do
+    case ApproovToken.verify_token(conn) do
+      {:ok, claims} -> {:ok, claims}
+      {:error, :missing_approov_token} -> {:error, :missing_approov_token}
+      {:error, _reason} -> {:error, :token_verification_failed}
+    end
+  end
+
+  defp verify_socket_token(token) do
+    case ApproovToken.verify_token_value(token) do
+      {:ok, claims} -> {:ok, claims}
+      {:error, :missing_approov_token} -> {:error, :missing_approov_token}
+      {:error, _reason} -> {:error, :token_verification_failed}
+    end
+  end
+
+  defp verify_http_binding(conn, claims) do
     case ProtectedRoutes.binding_for(conn.request_path) do
       :none ->
         :ok
 
       binding_mode ->
         if ApproovState.token_binding_enabled?() do
-          ApproovToken.verify_binding(conn, claims, binding_mode)
+          conn
+          |> ApproovToken.verify_binding(claims, binding_mode)
+          |> normalize_binding_result()
         else
           :ok
         end
     end
   end
 
-  defp unauthorized(conn, reason) do
+  defp verify_socket_binding(params, connect_info, claims) do
+    if ApproovState.token_binding_enabled?() do
+      with {:ok, binding_value} <- fetch_socket_binding_value(params, connect_info),
+           :ok <- ApproovToken.validate_binding(binding_value, claims) do
+        :ok
+      else
+        {:error, reason} -> {:error, normalize_binding_error(reason)}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp normalize_binding_result(:ok), do: :ok
+
+  defp normalize_binding_result({:error, reason}) do
+    {:error, normalize_binding_error(reason)}
+  end
+
+  defp normalize_binding_error(:missing_binding_header), do: :missing_binding_header
+  defp normalize_binding_error(:binding_mismatch), do: :binding_mismatch
+  defp normalize_binding_error(:unsupported_binding_mode), do: :unsupported_binding_mode
+  defp normalize_binding_error(_reason), do: :token_verification_failed
+
+  defp fetch_socket_binding_value(params, connect_info) do
+    auth_value =
+      param_value(params, ["authorization"]) ||
+        header_value(connect_info, "authorization")
+
+    session_value =
+      param_value(params, ["sessionid", "session_id"]) ||
+        header_value(connect_info, "sessionid")
+
+    binding_mode =
+      case params["binding"] || params["binding_mode"] do
+        "double" -> :double
+        "single" -> :single
+        _ -> if session_value, do: :double, else: :single
+      end
+
+    with {:ok, auth} <- require_binding_value(auth_value),
+         {:ok, session} <- require_optional_session(binding_mode, session_value) do
+      binding_value =
+        case binding_mode do
+          :double -> auth <> session
+          :single -> auth
+        end
+
+      {:ok, binding_value}
+    end
+  end
+
+  defp fetch_socket_token(params, connect_info) do
+    token =
+      params["approov_token"] ||
+        params["approov-token"] ||
+        params["approovToken"] ||
+        params["token"] ||
+        header_value(connect_info, "approov-token")
+
+    case token do
+      value when is_binary(value) ->
+        trimmed = String.trim(value)
+
+        if trimmed == "" do
+          {:error, :missing_approov_token}
+        else
+          {:ok, trimmed}
+        end
+
+      _ ->
+        {:error, :missing_approov_token}
+    end
+  end
+
+  defp require_binding_value(nil), do: {:error, :missing_binding_header}
+
+  defp require_binding_value(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if trimmed == "" do
+      {:error, :missing_binding_header}
+    else
+      {:ok, trimmed}
+    end
+  end
+
+  defp require_binding_value(_value), do: {:error, :missing_binding_header}
+
+  defp require_optional_session(:single, _value), do: {:ok, ""}
+  defp require_optional_session(:double, value), do: require_binding_value(value)
+
+  defp header_value(connect_info, header_name) do
+    headers =
+      case connect_info do
+        %{x_headers: x_headers} -> x_headers
+        _ -> []
+      end
+
+    Enum.find_value(headers, fn {key, value} ->
+      if String.downcase(key) == header_name do
+        value
+      end
+    end)
+  end
+
+  defp param_value(params, keys) do
+    Enum.find_value(keys, fn key ->
+      value = params[key]
+
+      if is_binary(value) do
+        String.trim(value)
+      end
+    end)
+  end
+end
+
+defmodule ApproovQuickstartWeb.ApproovUnauthorizedResponder do
+  @moduledoc false
+
+  import Plug.Conn
+
+  @spec respond(Plug.Conn.t()) :: Plug.Conn.t()
+  def respond(conn) do
     conn
-    |> put_private(:approov_failure_reason, reason)
     |> put_status(:unauthorized)
     |> Phoenix.Controller.json(%{})
     |> halt()
   end
+end
 
-  defp normalize_failure_reason(:missing_binding_header), do: :missing_binding_header
-  defp normalize_failure_reason(:binding_mismatch), do: :binding_mismatch
-  defp normalize_failure_reason(:missing_pay_claim), do: :token_verification_failed
-  defp normalize_failure_reason(reason), do: reason
+defmodule ApproovQuickstartWeb.ApproovTokenVerifier do
+  @moduledoc false
+
+  import Plug.Conn
+
+  alias ApproovQuickstart.ApproovRequestVerifier
+  alias ApproovQuickstartWeb.ApproovUnauthorizedResponder
+
+  def init(opts), do: opts
+
+  def call(conn, _opts) do
+    case ApproovRequestVerifier.verify_http_request(conn) do
+      {:ok, claims} ->
+        put_private(conn, :approov_token_claims, claims)
+
+      :skip ->
+        conn
+
+      {:error, reason} ->
+        conn
+        |> put_private(:approov_failure_reason, reason)
+        |> ApproovUnauthorizedResponder.respond()
+    end
+  end
 end
 
 defmodule ApproovQuickstartWeb.Router do
@@ -651,124 +827,19 @@ defmodule ApproovQuickstartWeb.UserSocket do
 
   channel "echo:lobby", ApproovQuickstartWeb.EchoChannel
 
-  alias ApproovQuickstart.ApproovState
-  alias ApproovQuickstart.ApproovToken
+  alias ApproovQuickstart.ApproovRequestVerifier
 
   def connect(params, socket, connect_info) do
-    if ApproovState.approov_enabled?() do
-      with {:ok, token} <- fetch_token(params, connect_info),
-           {:ok, claims} <- ApproovToken.verify_token_value(token),
-           :ok <- verify_binding_if_needed(params, connect_info, claims) do
+    case ApproovRequestVerifier.verify_socket_request(params, connect_info) do
+      {:ok, claims} ->
         {:ok, assign(socket, :approov_token_claims, claims)}
-      else
-        {:error, _reason} -> :error
-      end
-    else
-      {:ok, socket}
+
+      :skip ->
+        {:ok, socket}
+
+      {:error, _reason} ->
+        :error
     end
-  end
-
-  defp verify_binding_if_needed(params, connect_info, claims) do
-    if ApproovState.token_binding_enabled?() do
-      with {:ok, binding_value} <- fetch_binding_value(params, connect_info),
-           :ok <- ApproovToken.validate_binding(binding_value, claims) do
-        :ok
-      end
-    else
-      :ok
-    end
-  end
-
-  defp fetch_binding_value(params, connect_info) do
-    auth_value =
-      param_value(params, ["authorization"]) ||
-        header_value(connect_info, "authorization")
-
-    session_value =
-      param_value(params, ["sessionid", "session_id"]) ||
-        header_value(connect_info, "sessionid")
-
-    binding_mode =
-      case (params["binding"] || params["binding_mode"]) do
-        "double" -> :double
-        "single" -> :single
-        _ -> if session_value, do: :double, else: :single
-      end
-
-    with {:ok, auth} <- require_value(auth_value),
-         {:ok, session} <- require_optional_session(binding_mode, session_value) do
-      binding_value =
-        case binding_mode do
-          :double -> auth <> session
-          :single -> auth
-        end
-
-      {:ok, binding_value}
-    end
-  end
-
-  defp require_value(nil), do: {:error, :missing_binding_header}
-
-  defp require_value(value) when is_binary(value) do
-    trimmed = String.trim(value)
-
-    if trimmed == "" do
-      {:error, :missing_binding_header}
-    else
-      {:ok, trimmed}
-    end
-  end
-
-  defp require_value(_value), do: {:error, :missing_binding_header}
-
-  defp require_optional_session(:single, _value), do: {:ok, ""}
-  defp require_optional_session(:double, value), do: require_value(value)
-
-  defp fetch_token(params, connect_info) do
-    token =
-      params["approov_token"] ||
-        params["approov-token"] ||
-        params["approovToken"] ||
-        params["token"] ||
-        header_value(connect_info, "approov-token")
-
-    case token do
-      value when is_binary(value) ->
-        trimmed = String.trim(value)
-
-        if trimmed == "" do
-          {:error, :missing_approov_token}
-        else
-          {:ok, trimmed}
-        end
-
-      _ ->
-        {:error, :missing_approov_token}
-    end
-  end
-
-  defp header_value(connect_info, header_name) do
-    headers =
-      case connect_info do
-        %{x_headers: x_headers} -> x_headers
-        _ -> []
-      end
-
-    Enum.find_value(headers, fn {key, value} ->
-      if String.downcase(key) == header_name do
-        value
-      end
-    end)
-  end
-
-  defp param_value(params, keys) do
-    Enum.find_value(keys, fn key ->
-      value = params[key]
-
-      if is_binary(value) do
-        String.trim(value)
-      end
-    end)
   end
 
   def id(_socket), do: nil

@@ -16,6 +16,12 @@ Example (double binding):
 ws://localhost:8080/socket/websocket?approov_token=YOUR_TOKEN&authorization=ExampleAuthToken==&sessionid=123
 ```
 
+*Generate a valid Approov token bound to the `Authorization` and `SessionId` headers:*
+
+```bash
+approov token -setDataHashInToken ExampleAuthToken==123 -genExample example.com
+```
+
 Quick test with `wscat` (same URL as above; `=` must be URL-encoded):
 ```bash
 wscat -c "ws://localhost:8080/socket/websocket?approov_token=YOUR_TOKEN&authorization=ExampleAuthToken%3D%3D&sessionid=123"
@@ -36,22 +42,22 @@ This performs a WebSocket smoke test (connect, join, echo) using an Approov toke
 In this example, Approov token check is implemented in `ApproovApplication.ex`. The responsibilities break down as follows:
 
 1. **JWT Approov Token validation (signature + expiry)** is implemented in
-   [verify_token/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L80-L89). It verifies the HS256 signature and rejects tokens that are missing or past `exp` via [verify_and_decode/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L125-L137).
+   [verify_token/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L80-L89). It verifies the HS256 signature and rejects tokens that are missing or past `exp` via [verify_and_decode/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L125-L138).
 
 2. **Token binding (`pay` + hash)** is handled by
   [validate_binding/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L226-L237). It computes `Base.encode64(:crypto.hash(:sha256, binding_value))` and compares it to `pay` with `Plug.Crypto.secure_compare/2`.
 
 3. **Middleware enforcement (token + binding)** is done by
-  [ApproovTokenVerifier.call/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L462-480) for routes in the `:approov_protected` pipeline. Requests without valid token/binding are rejected with `401`.
+  [ApproovTokenVerifier.call/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L670-483), which delegates verification to [verify_http_request/1](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L466-L475) in the [:approov_protected](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L693-L695) pipeline. Requests without valid token/binding are rejected with `401`.
 
-4. **Binding value selection (what gets hashed)** is in
-  [extract_binding_value/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L192-L219). It uses the header list returned by [binding_headers/1](lib/ApproovApplication.ex#L222-L224), currently `Authorization` for single binding, or `Authorization + SessionId` for double binding.
+1. **Binding value selection (what gets hashed)** is in
+  [extract_binding_value/2](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L192-L220). It uses the header list returned by [binding_headers/1](lib/ApproovApplication.ex#L222-L224), currently `Authorization` for single binding, or `Authorization + SessionId` for double binding.
 
-5. **Protected route requirements** are defined in
+1. **Protected route requirements** are defined in
   [ProtectedRoutes](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L1-L21).
 
-6. **Protected routes are registered** in the
-  [ApproovQuickstartWeb.Router](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L535-L540) scope that runs through the [:approov_protected](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L517-L519).
+1. **Protected routes are registered** in the
+  [ApproovQuickstartWeb.Router](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L693-L695) scope that runs through the [:approov_protected](https://github.com/approov/quickstart-elixir-phoenix-channels-token-check/blob/refactor/elixir-phoenix-channels/lib/ApproovApplication.ex#L711-L717).
 
 ## Approov Token Verification Flow
 
