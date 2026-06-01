@@ -333,7 +333,7 @@ If you find any issue while following our instructions then just report it [here
 
 If you wish to explore the Approov solution in more depth, then why not try one of the following links as a jumping off point:
 
-* [Approov Free Trial](https://approov.io/signup)(no credit card needed)
+* [Approov Free Trial](https://approov.io/signup) (no credit card needed)
 * [Approov Get Started](https://approov.io/product/demo)
 * [Approov QuickStarts](https://approov.io/docs/latest/approov-integration-examples/)
 * [Approov Docs](https://approov.io/docs)
