@@ -1,0 +1,39 @@
+ARG ELIXIR_DOCKER_TAG=1.18.4-slim
+
+FROM elixir:${ELIXIR_DOCKER_TAG}
+
+ARG CONTAINER_USER_NAME=developer
+ARG CONTAINER_UID=1000
+ARG CONTAINER_GID=1000
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    USER=${CONTAINER_USER_NAME} \
+    HOME=/home/${CONTAINER_USER_NAME} \
+    CONTAINER_HOME=/home/${CONTAINER_USER_NAME} \
+    LANG=C.UTF-8 \
+    MIX_ENV=prod
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        binutils \
+        build-essential \
+        ca-certificates \
+        git \
+        openssl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid "${CONTAINER_GID}" "${CONTAINER_USER_NAME}" \
+    && useradd \
+        --uid "${CONTAINER_UID}" \
+        --gid "${CONTAINER_GID}" \
+        --create-home \
+        --shell /bin/bash \
+        "${CONTAINER_USER_NAME}"
+
+USER ${CONTAINER_USER_NAME}
+
+RUN mix local.hex --force \
+    && mix local.rebar --force
+
+WORKDIR ${CONTAINER_HOME}/workspace
+
+CMD ["bash"]
