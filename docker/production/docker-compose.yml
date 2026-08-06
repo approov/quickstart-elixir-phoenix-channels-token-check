@@ -3,7 +3,7 @@ version: "2.1"
 services:
 
   base-image:
-    image: approov/quickstart-elixir-phoenix-channels
+    image: approov/quickstart-elixir-phoenix-channels:${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
     build:
       context: .
       dockerfile: Dockerfile.base
@@ -15,6 +15,7 @@ services:
     build:
       context: .
       args:
+        - ELIXIR_DOCKER_TAG=${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
         - SERVER_NAME=unprotected-server
         - GIT_CHECKOUT_TO=${BUILD_RELEASE_FROM? Missing env var BUILD_RELEASE_FROM}
     restart: unless-stopped
@@ -41,6 +42,7 @@ services:
     build:
       context: .
       args:
+        - ELIXIR_DOCKER_TAG=${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
         - SERVER_NAME=approov-protected-server/token-check
         - GIT_CHECKOUT_TO=${BUILD_RELEASE_FROM? Missing var BUILD_RELEASE_FROM}
     restart: unless-stopped
@@ -67,6 +69,7 @@ services:
     build:
       context: .
       args:
+        - ELIXIR_DOCKER_TAG=${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
         - SERVER_NAME=approov-protected-server/token-binding-check
         - GIT_CHECKOUT_TO=${BUILD_RELEASE_FROM? Missing var BUILD_RELEASE_FROM}
     restart: unless-stopped
