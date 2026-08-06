@@ -8,10 +8,10 @@ services:
       context: .
       dockerfile: Dockerfile.base
       args:
-        - ELIXIR_DOCKER_TAG=${ELIXIR_DOCKER_TAG:-1.18.4-slim}
+        - ELIXIR_DOCKER_TAG=${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
 
   unprotected:
-    image: approov/quickstart-elixir-phoenix-channels:unprotect_${ELIXIR_DOCKER_TAG:-1.18.4-slim}
+    image: approov/quickstart-elixir-phoenix-channels:unprotect_${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
     build:
       context: .
       args:
@@ -37,7 +37,7 @@ services:
       - "traefik.frontend.rule=Host:unprotected.${BASE_URL_PUBLIC_HOST}"
 
   approov-token:
-    image: approov/quickstart-elixir-phoenix-channels:approov-token_${ELIXIR_DOCKER_TAG:-1.18.4-slim}
+    image: approov/quickstart-elixir-phoenix-channels:approov-token_${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
     build:
       context: .
       args:
@@ -63,7 +63,7 @@ services:
       - "traefik.frontend.rule=Host:token.${BASE_URL_PUBLIC_HOST}"
 
   approov-token-binding:
-    image: approov/quickstart-elixir-phoenix-channels:approov-token-binding_${ELIXIR_DOCKER_TAG:-1.18.4-slim}
+    image: approov/quickstart-elixir-phoenix-channels:approov-token-binding_${ELIXIR_DOCKER_TAG:-1.18.4-otp-27-slim}
     build:
       context: .
       args:
